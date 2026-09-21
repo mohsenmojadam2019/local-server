@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Local Server Pro</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">LS</div>
+        <div><strong>Local Server Pro</strong><span>مرکز مدیریت سرور محلی</span></div>
+      </div>
+      <nav id="nav" class="nav">
+        <button class="nav-item active" data-page="dashboard"><span>⌂</span>داشبورد</button>
+        <button class="nav-item" data-page="projects"><span>▦</span>پروژه‌ها</button>
+        <button class="nav-item" data-page="domains"><span>◎</span>دامنه و CDN</button>
+        <button class="nav-item" data-page="cloudflare"><span>☁</span>Cloudflare Tunnel</button>
+        <button class="nav-item" data-page="logs"><span>≡</span>لاگ زنده</button>
+        <button class="nav-item" data-page="settings"><span>⚙</span>تنظیمات</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="mini-status"><span id="proxyDot" class="status-dot"></span><div><b>Reverse Proxy</b><small id="proxyLabel">در حال بررسی...</small></div></div>
+        <div class="mini-status"><span id="cfDot" class="status-dot"></span><div><b>Cloudflare</b><small id="cfLabel">در حال بررسی...</small></div></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">داشبورد</h1>
+          <p id="pageSubtitle">کنترل پروژه‌ها، دامنه‌ها، تونل و وضعیت سرویس‌ها</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn ghost" id="refreshBtn">↻ تازه‌سازی</button>
+          <button class="btn primary" id="addProjectBtn">＋ افزودن پروژه</button>
+        </div>
+      </header>
+
+      <section id="toastHost" class="toast-host"></section>
+
+      <section class="page active" id="page-dashboard">
+        <div class="hero-card">
+          <div>
+            <div class="eyebrow">LOCAL DEVELOPMENT CLOUD</div>
+            <h2>هر پروژه، یک سرویس واقعی با دامنه مستقل</h2>
+            <p>پروژه‌های Node، Nuxt، React، Laravel، Django و سرویس‌های سفارشی را هم‌زمان اجرا کن، روی دامنه دلخواه Route بده و در صورت نیاز از Cloudflare Tunnel برای دسترسی اینترنتی HTTPS استفاده کن.</p>
+          </div>
+          <div class="hero-side">
+            <span>Proxy Endpoint</span>
+            <code id="proxyEndpoint">—</code>
+            <small>WebSocket / HMR پشتیبانی می‌شود</small>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <article class="stat-card"><span>کل پروژه‌ها</span><strong id="statProjects">0</strong><small>ثبت‌شده در پنل</small></article>
+          <article class="stat-card"><span>در حال اجرا</span><strong id="statRunning">0</strong><small>پردازش فعال</small></article>
+          <article class="stat-card"><span>دامنه‌های متصل</span><strong id="statDomains">0</strong><small>Local + Public</small></article>
+          <article class="stat-card"><span>Cloudflare Tunnel</span><strong id="statTunnel">خاموش</strong><small id="statTunnelSub">وضعیت اتصال</small></article>
+        </div>
+
+        <div class="section-head"><div><h3>پروژه‌های فعال</h3><p>کنترل سریع پردازش‌ها و وضعیت Health Check</p></div><button class="link-btn" data-go="projects">مشاهده همه ←</button></div>
+        <div id="dashboardProjects" class="project-grid"></div>
+
+        <div class="two-col">
+          <article class="panel">
+            <div class="panel-title"><div><h3>دسترسی شبکه</h3><p>آدرس‌های قابل استفاده روی سیستم و شبکه داخلی</p></div></div>
+            <div id="networkList" class="kv-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-title"><div><h3>معماری انتشار</h3><p>مسیر درخواست از اینترنت تا پروژه</p></div></div>
+            <div class="flow"><span>Domain</span><i>←</i><span>Cloudflare CDN</span><i>←</i><span>Tunnel</span><i>←</i><span>Reverse Proxy</span><i>←</i><span>Project</span></div>
+            <div class="notice">برای وب‌گیم‌های مبتنی بر HTTP/WebSocket همین معماری در فاز بعدی قابل استفاده است. بازی‌های Native با UDP/TCP خام به مسیر انتشار جداگانه نیاز دارند.</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-projects">
+        <div class="toolbar panel compact">
+          <div class="search-wrap"><input id="projectSearch" class="input" placeholder="جستجو در پروژه‌ها..." /></div>
+          <div class="filter-group"><button class="chip active" data-filter="all">همه</button><button class="chip" data-filter="running">فعال</button><button class="chip" data-filter="stopped">متوقف</button></div>
+        </div>
+        <div id="projectsGrid" class="project-grid wide"></div>
+      </section>
+
+      <section class="page" id="page-domains">
+        <div class="section-head"><div><h3>Domain Routing & CDN</h3><p>هر دامنه را به یک پروژه متصل کن؛ HTTPS و اتصال اینترنتی از طریق Cloudflare Tunnel انجام می‌شود.</p></div><button class="btn primary" id="addDomainBtn">＋ اتصال دامنه</button></div>
+        <div class="cdn-presets">
+          <article class="preset"><b>CDN خاموش</b><span>بدون تغییر هدر Cache-Control</span></article>
+          <article class="preset selected"><b>استاندارد</b><span>کش Edge برای فایل‌های Static و HMR-safe</span></article>
+          <article class="preset"><b>تهاجمی</b><span>TTL بیشتر برای Assetها؛ مناسب Production Preview</span></article>
+        </div>
+        <div class="panel table-panel">
+          <table><thead><tr><th>دامنه</th><th>پروژه</th><th>نوع</th><th>CDN</th><th>وضعیت</th><th></th></tr></thead><tbody id="domainsTable"></tbody></table>
+        </div>
+        <div class="notice warning"><b>نکته:</b> Cloudflare Tunnel برای وب‌سایت، API و WebSocket بسیار مناسب است. برای Game Serverهایی که UDP/TCP اختصاصی می‌خواهند، در فاز Game Hosting باید Port Gateway جداگانه اضافه شود.</div>
+      </section>
+
+      <section class="page" id="page-cloudflare">
+        <div class="cf-grid">
+          <article class="panel cf-main">
+            <div class="panel-title"><div><h3>Cloudflare Tunnel</h3><p>بدون باز کردن پورت مودم، دامنه عمومی را مستقیم به پروژه‌های لوکال وصل کن.</p></div><span id="cfBadge" class="badge">—</span></div>
+            <div class="connection-card">
+              <div class="connection-line"><span>cloudflared</span><b id="cfInstalled">در حال بررسی</b></div>
+              <div class="connection-line"><span>Tunnel Name</span><code id="cfTunnelName">—</code></div>
+              <div class="connection-line"><span>Tunnel ID</span><code id="cfTunnelId">—</code></div>
+              <div class="connection-line"><span>Process</span><b id="cfProcess">—</b></div>
+            </div>
+            <div class="button-row">
+              <button class="btn ghost" id="cfLoginBtn">ورود Cloudflare</button>
+              <button class="btn ghost" id="cfCreateBtn">ساخت Tunnel</button>
+              <button class="btn success" id="cfStartBtn">▶ روشن کردن</button>
+              <button class="btn danger" id="cfStopBtn">■ توقف</button>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-title"><div><h3>راهنمای سریع</h3><p>راه‌اندازی یک‌باره</p></div></div>
+            <ol class="steps"><li>cloudflared را نصب کن.</li><li>روی «ورود Cloudflare» بزن و دامنه را تأیید کن.</li><li>Tunnel را بساز.</li><li>از بخش دامنه، hostname را به پروژه وصل کن.</li><li>Tunnel را روشن کن.</li></ol>
+            <button class="btn ghost full" id="copyWinget">کپی دستور نصب Windows</button>
+          </article>
+        </div>
+        <article class="panel terminal-panel"><div class="panel-title"><div><h3>Cloudflare Live Log</h3><p>خروجی cloudflared</p></div><button class="link-btn" id="clearCfLog">پاک‌کردن نمایش</button></div><pre id="cfLog" class="terminal">هنوز لاگی ثبت نشده است.</pre></article>
+      </section>
+
+      <section class="page" id="page-logs">
+        <div class="panel compact log-toolbar"><select id="logProjectSelect" class="input"></select><button id="reloadLogsBtn" class="btn ghost">↻ بارگذاری</button></div>
+        <article class="panel terminal-panel"><div class="panel-title"><div><h3>Live Process Log</h3><p id="logProjectLabel">یک پروژه انتخاب کنید</p></div><button class="link-btn" id="clearLogView">پاک‌کردن نمایش</button></div><pre id="projectLog" class="terminal large">—</pre></article>
+      </section>
+
+      <section class="page" id="page-settings">
+        <div class="settings-grid">
+          <article class="panel">
+            <div class="panel-title"><div><h3>Reverse Proxy</h3><p>مسیریاب مرکزی دامنه‌ها به پروژه‌ها</p></div></div>
+            <label class="field"><span>پورت Proxy</span><input id="settingProxyPort" class="input" type="number" /></label>
+            <label class="switch-field"><div><b>دسترسی شبکه داخلی</b><small>Proxy روی 0.0.0.0 گوش می‌دهد</small></div><input id="settingLanProxy" type="checkbox" /></label>
+            <label class="field"><span>CDN پیش‌فرض</span><select id="settingCdn" class="input"><option value="off">خاموش</option><option value="standard">استاندارد</option><option value="aggressive">تهاجمی</option></select></label>
+          </article>
+          <article class="panel">
+            <div class="panel-title"><div><h3>پنل مدیریت</h3><p>دسترسی فقط از همین سیستم توصیه می‌شود</p></div></div>
+            <label class="field"><span>Admin Port</span><input id="settingAdminPort" class="input" type="number" disabled /></label>
+            <label class="switch-field"><div><b>باز کردن مرورگر هنگام اجرا</b><small>پس از Start شدن سرویس</small></div><input id="settingOpenBrowser" type="checkbox" /></label>
+            <div class="notice">برای امنیت، پنل مدیریت به‌صورت پیش‌فرض فقط روی 127.0.0.1 در دسترس است.</div>
+          </article>
+        </div>
+        <div class="button-row end"><button class="btn primary" id="saveSettingsBtn">ذخیره تنظیمات</button></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="projectModal">
+    <div class="modal large-modal">
+      <div class="modal-head"><div><h3 id="projectModalTitle">افزودن پروژه</h3><p>مسیر، دستور اجرا، پورت و دامنه لوکال را تعریف کن.</p></div><button class="icon-btn" data-close="projectModal">×</button></div>
+      <form id="projectForm">
+        <input type="hidden" id="projectId" />
+        <div class="form-grid">
+          <label class="field"><span>نام پروژه</span><input id="projectName" class="input" required placeholder="مثلاً DigiZargar Front" /></label>
+          <label class="field"><span>Slug</span><input id="projectSlug" class="input" placeholder="digizargar-front" /></label>
+          <label class="field full-span"><span>مسیر پروژه</span><div class="input-action"><input id="projectPath" class="input" required placeholder="C:\\Projects\\my-app" /><button type="button" id="browseBtn" class="btn ghost">انتخاب پوشه</button><button type="button" id="detectBtn" class="btn ghost">تشخیص</button></div></label>
+          <label class="field full-span"><span>دستور اجرا</span><input id="projectCommand" class="input ltr" required placeholder="npm run dev -- --port {port}" /><small>از <code>{port}</code> برای پورت پروژه استفاده کن.</small></label>
+          <label class="field"><span>پورت</span><input id="projectPort" class="input" type="number" min="1" max="65535" /></label>
+          <label class="field"><span>Framework</span><input id="projectFramework" class="input" placeholder="nuxt / vite / laravel ..." /></label>
+          <label class="field"><span>دامنه لوکال</span><input id="projectLocalHost" class="input ltr" placeholder="myapp.localhost" /></label>
+          <label class="field"><span>CDN Preset</span><select id="projectCdn" class="input"><option value="off">خاموش</option><option value="standard">استاندارد</option><option value="aggressive">تهاجمی</option></select></label>
+          <label class="switch-field"><div><b>اجرای خودکار</b><small>همراه Local Server Pro</small></div><input id="projectAutoStart" type="checkbox" /></label>
+          <label class="switch-field"><div><b>Restart خودکار</b><small>در صورت Crash شدن پردازش</small></div><input id="projectAutoRestart" type="checkbox" checked /></label>
+        </div>
+        <div class="modal-actions"><button type="button" class="btn ghost" data-close="projectModal">انصراف</button><button class="btn primary" type="submit">ذخیره پروژه</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="domainModal">
+    <div class="modal">
+      <div class="modal-head"><div><h3>اتصال دامنه</h3><p>دامنه عمومی را به یکی از پروژه‌ها Route کن.</p></div><button class="icon-btn" data-close="domainModal">×</button></div>
+      <form id="domainForm">
+        <label class="field"><span>پروژه</span><select id="domainProject" class="input" required></select></label>
+        <label class="field"><span>دامنه</span><input id="domainHostname" class="input ltr" required placeholder="app.example.com" /></label>
+        <div class="notice">با ثبت دامنه، دستور DNS Route برای Tunnel اجرا می‌شود. دامنه باید داخل اکانت Cloudflare شما باشد.</div>
+        <div class="modal-actions"><button type="button" class="btn ghost" data-close="domainModal">انصراف</button><button class="btn primary" type="submit">اتصال و فعال‌سازی</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="browserModal">
+    <div class="modal large-modal">
+      <div class="modal-head"><div><h3>انتخاب پوشه پروژه</h3><p id="browserPath">—</p></div><button class="icon-btn" data-close="browserModal">×</button></div>
+      <div class="browser-actions"><button id="browserUp" class="btn ghost">↑ پوشه بالاتر</button><button id="browserSelect" class="btn primary">انتخاب همین پوشه</button></div>
+      <div id="browserList" class="browser-list"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
