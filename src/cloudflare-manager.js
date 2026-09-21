@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const YAML = require('yaml');
-const { CLOUDFLARE_DIR } = require('./constants');
+const { CLOUDFLARE_DIR, PORTABLE_CLOUDFLARED } = require('./constants');
 const { ensureDir, normalizeHost, pathExists } = require('./utils');
 
 class CloudflareManager extends EventEmitter {
@@ -14,9 +14,13 @@ class CloudflareManager extends EventEmitter {
     this.logs = [];
   }
 
+  binary() {
+    return fs.existsSync(PORTABLE_CLOUDFLARED) ? PORTABLE_CLOUDFLARED : 'cloudflared';
+  }
+
   runCapture(args, options = {}) {
     return new Promise((resolve, reject) => {
-      const child = spawn('cloudflared', args, { shell: true, windowsHide: true, ...options });
+      const child = spawn(this.binary(), args, { shell: true, windowsHide: true, ...options });
       let stdout = '';
       let stderr = '';
       child.stdout?.on('data', (d) => { stdout += d.toString(); });
@@ -59,7 +63,7 @@ class CloudflareManager extends EventEmitter {
   }
 
   async login() {
-    const child = spawn('cloudflared', ['tunnel', 'login'], { shell: true, stdio: 'inherit', windowsHide: false });
+    const child = spawn(this.binary(), ['tunnel', 'login'], { shell: true, stdio: 'inherit', windowsHide: false });
     return { pid: child.pid, message: 'مرورگر برای ورود Cloudflare باز می‌شود. پس از تأیید، دوباره وضعیت را بررسی کنید.' };
   }
 
@@ -120,6 +124,10 @@ class CloudflareManager extends EventEmitter {
     if (!cf.tunnelId || !cf.credentialsFile) return null;
     const projectDomains = [];
     for (const project of data.projects || []) {
+      const publicHost = normalizeHost(project.publicHost || '');
+      if (project.publishEnabled && publicHost && (cf.managedDomains || []).includes(publicHost)) {
+        projectDomains.push(publicHost);
+      }
       for (const domain of project.domains || []) {
         const hostname = normalizeHost(domain.hostname || domain);
         if (hostname && (cf.managedDomains || []).includes(hostname)) projectDomains.push(hostname);
@@ -139,6 +147,22 @@ class CloudflareManager extends EventEmitter {
     return file;
   }
 
+  async syncPublishedDomains() {
+    const cf = this.store.get().cloudflare;
+    if (!cf.tunnelId || !cf.tunnelName) return [];
+    const published = (this.store.get().projects || [])
+      .filter((p) => p.publishEnabled && normalizeHost(p.publicHost || ''))
+      .map((p) => normalizeHost(p.publicHost));
+    const synced = [];
+    for (const hostname of [...new Set(published)]) {
+      if ((this.store.get().cloudflare.managedDomains || []).includes(hostname)) continue;
+      await this.routeDomain(hostname);
+      synced.push(hostname);
+    }
+    await this.writeConfig();
+    return synced;
+  }
+
   async start() {
     if (this.process) return this.status();
     const cf = this.store.get().cloudflare;
@@ -146,7 +170,7 @@ class CloudflareManager extends EventEmitter {
     if (cf.credentialsFile && !(await pathExists(cf.credentialsFile))) throw new Error('فایل credentials تونل پیدا نشد. Cloudflare Login را دوباره انجام دهید.');
     const configFile = await this.writeConfig();
     if (!configFile) throw new Error('فایل تنظیمات Cloudflare ساخته نشد.');
-    const child = spawn('cloudflared', ['tunnel', '--config', configFile, 'run', cf.tunnelName], { shell: true, windowsHide: true });
+    const child = spawn(this.binary(), ['tunnel', '--config', configFile, 'run', cf.tunnelName], { shell: true, windowsHide: true });
     this.process = child;
     this.appendLog('system', `▶ cloudflared tunnel run ${cf.tunnelName}`);
     child.stdout?.on('data', (d) => this.appendLog('stdout', d));

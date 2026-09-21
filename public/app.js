@@ -78,6 +78,7 @@ function projectCard(project) {
     </div>
     <div class="project-meta">
       <div class="meta"><span>Local Domain</span><code title="${esc(localUrl)}">${esc(project.localHost)}</code></div>
+      <div class="meta"><span>Public Domain</span><code>${esc(project.publicHost || '—')}</code></div>
       <div class="meta"><span>Port</span><b>${esc(project.port)}</b></div>
       <div class="meta"><span>CPU / RAM</span><b>${metric ? `${metric.cpu}% · ${fmtBytes(metric.memory)}` : '—'}</b></div>
       <div class="meta"><span>Uptime</span><b>${fmtUptime(metric?.elapsed)}</b></div>
@@ -86,6 +87,7 @@ function projectCard(project) {
     <div class="project-actions">
       ${running ? `<button class="btn danger" data-action="stop">■ توقف</button><button class="btn ghost" data-action="restart">↻ Restart</button>` : `<button class="btn success" data-action="start">▶ اجرا</button>`}
       <button class="btn ghost" data-action="open">↗ باز کردن</button>
+      <label class="switch-field compact-switch"><div><b>Auto Start</b></div><input type="checkbox" data-autostart ${project.autoStart ? 'checked' : ''} /></label>
       <button class="btn ghost project-more" data-action="edit">•••</button>
     </div>
   </article>`;
@@ -128,12 +130,33 @@ function bindProjectActions() {
       finally { button.disabled = false; }
     };
   });
+  $$('.project-card [data-autostart]').forEach((toggle) => {
+    toggle.onchange = async () => {
+      const card = toggle.closest('.project-card');
+      const id = card.dataset.id;
+      toggle.disabled = true;
+      try {
+        await api(`/api/projects/${id}`, { method: 'PUT', body: { autoStart: toggle.checked } });
+        toast(toggle.checked ? 'اجرای خودکار فعال شد.' : 'اجرای خودکار غیرفعال شد.');
+        await loadStatus();
+      } catch (e) {
+        toggle.checked = !toggle.checked;
+        toast(e.message, 'error');
+      } finally {
+        toggle.disabled = false;
+      }
+    };
+  });
 }
 
 function renderDomains() {
   const rows = [];
   for (const project of state.projects) {
     rows.push(`<tr><td><code class="domain-name">${esc(project.localHost)}</code></td><td>${esc(project.name)}</td><td><span class="badge">Local</span></td><td>${esc(project.cdnPreset || 'standard')}</td><td><span class="badge running">● آماده</span></td><td></td></tr>`);
+    if (project.publicHost) {
+      const managedPublic = (state.cloudflare?.domains || []).includes(project.publicHost);
+      rows.push(`<tr><td><code class="domain-name">${esc(project.publicHost)}</code></td><td>${esc(project.name)}</td><td><span class="badge">Public</span></td><td>${esc(project.cdnPreset || 'standard')}</td><td><span class="badge ${managedPublic ? 'running' : ''}">${project.publishEnabled ? (managedPublic ? '● Route شده' : '○ آماده Route') : '○ انتشار خاموش'}</span></td><td></td></tr>`);
+    }
     for (const item of project.domains || []) {
       const host = item.hostname || item;
       const managed = (state.cloudflare?.domains || []).includes(host);
@@ -170,7 +193,7 @@ function renderCloudflare() {
 function renderDashboard() {
   const settings = state.status?.settings || {};
   const running = state.projects.filter((p) => ['running', 'starting'].includes(p.runtime?.status)).length;
-  const publicDomains = state.projects.reduce((sum, p) => sum + (p.domains?.length || 0), 0);
+  const publicDomains = state.projects.reduce((sum, p) => sum + (p.domains?.length || 0) + (p.publicHost ? 1 : 0), 0);
   $('#statProjects').textContent = state.projects.length;
   $('#statRunning').textContent = running;
   $('#statDomains').textContent = state.projects.length + publicDomains;
@@ -231,6 +254,8 @@ function fillProjectModal(project = null) {
   $('#projectPort').value = project?.port || '';
   $('#projectFramework').value = project?.framework || '';
   $('#projectLocalHost').value = project?.localHost || '';
+  $('#projectPublicHost').value = project?.publicHost || '';
+  $('#projectPublishEnabled').checked = Boolean(project?.publishEnabled);
   $('#projectCdn').value = project?.cdnPreset || state.status?.settings?.defaultCdnPreset || 'standard';
   $('#projectAutoStart').checked = Boolean(project?.autoStart);
   $('#projectAutoRestart').checked = project ? project.autoRestart !== false : true;
@@ -247,14 +272,18 @@ async function submitProject(e) {
     port: Number($('#projectPort').value) || undefined,
     framework: $('#projectFramework').value,
     localHost: $('#projectLocalHost').value,
+    publicHost: $('#projectPublicHost').value,
+    publishEnabled: $('#projectPublishEnabled').checked,
     cdnPreset: $('#projectCdn').value,
     autoStart: $('#projectAutoStart').checked,
     autoRestart: $('#projectAutoRestart').checked,
   };
   try {
-    if (id) await api(`/api/projects/${id}`, { method: 'PUT', body });
-    else await api('/api/projects', { method: 'POST', body });
+    const result = id
+      ? await api(`/api/projects/${id}`, { method: 'PUT', body })
+      : await api('/api/projects', { method: 'POST', body });
     toast(id ? 'پروژه ویرایش شد.' : 'پروژه اضافه شد.');
+    if (result.publicationWarning) toast(`پروژه ذخیره شد، اما Route دامنه انجام نشد: ${result.publicationWarning}`, 'error');
     closeModal('projectModal');
     await loadStatus();
   } catch (error) { toast(error.message, 'error'); }

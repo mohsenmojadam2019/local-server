@@ -25,6 +25,25 @@ function apiError(res, error, status = 400) {
   res.status(status).json({ ok: false, error: error?.message || String(error) });
 }
 
+async function syncProjectPublication(project, previous = null) {
+  const oldHost = normalizeHost(previous?.publicHost || '');
+  const newHost = normalizeHost(project?.publicHost || '');
+  if (oldHost && (oldHost !== newHost || !project?.publishEnabled)) {
+    await cloudflare.unmanageDomain(oldHost).catch(() => {});
+  }
+  if (project?.publishEnabled && newHost && store.get().cloudflare.tunnelId) {
+    try {
+      await cloudflare.routeDomain(newHost);
+      return null;
+    } catch (error) {
+      await cloudflare.writeConfig().catch(() => {});
+      return error.message;
+    }
+  }
+  await cloudflare.writeConfig().catch(() => {});
+  return null;
+}
+
 function emitSse(event, data) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const client of sseClients) client.write(payload);
@@ -50,7 +69,7 @@ app.get('/api/status', async (req, res) => {
   const settings = store.get().settings;
   res.json({
     ok: true,
-    app: { name: APP_NAME, version: APP_VERSION, dataDir: DATA_DIR, platform: process.platform, node: process.version },
+    app: { name: APP_NAME, version: APP_VERSION, dataDir: DATA_DIR, platform: process.platform, node: process.version, database: store.info() },
     settings,
     projects: projects.list(),
     lan: getLanAddresses(),
@@ -65,16 +84,27 @@ app.post('/api/projects/detect', async (req, res) => {
   catch (error) { apiError(res, error); }
 });
 app.post('/api/projects', async (req, res) => {
-  try { res.status(201).json({ ok: true, project: await projects.create(req.body) }); }
-  catch (error) { apiError(res, error); }
+  try {
+    const project = await projects.create(req.body);
+    const publicationWarning = await syncProjectPublication(project);
+    res.status(201).json({ ok: true, project, publicationWarning });
+  } catch (error) { apiError(res, error); }
 });
 app.put('/api/projects/:id', async (req, res) => {
-  try { res.json({ ok: true, project: await projects.update(req.params.id, req.body) }); }
-  catch (error) { apiError(res, error); }
+  try {
+    const previous = projects.get(req.params.id) ? structuredClone(projects.get(req.params.id)) : null;
+    const project = await projects.update(req.params.id, req.body);
+    const publicationWarning = await syncProjectPublication(project, previous);
+    res.json({ ok: true, project, publicationWarning });
+  } catch (error) { apiError(res, error); }
 });
 app.delete('/api/projects/:id', async (req, res) => {
-  try { await projects.remove(req.params.id); res.json({ ok: true }); }
-  catch (error) { apiError(res, error); }
+  try {
+    const project = projects.get(req.params.id);
+    if (project?.publicHost) await cloudflare.unmanageDomain(project.publicHost).catch(() => {});
+    await projects.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (error) { apiError(res, error); }
 });
 for (const action of ['start', 'stop', 'restart']) {
   app.post(`/api/projects/:id/${action}`, async (req, res) => {
@@ -90,7 +120,7 @@ app.get('/api/settings', (req, res) => res.json({ ok: true, settings: store.get(
 app.put('/api/settings', async (req, res) => {
   const before = { ...store.get().settings };
   try {
-    const allowed = ['adminHost', 'adminPort', 'proxyHost', 'proxyPort', 'autoOpenBrowser', 'allowLanProxy', 'defaultCdnPreset', 'logLimitPerProject'];
+    const allowed = ['adminHost', 'adminPort', 'proxyHost', 'proxyPort', 'autoOpenBrowser', 'allowLanProxy', 'autoStartTunnel', 'defaultCdnPreset', 'logLimitPerProject'];
     await store.mutate((data) => {
       for (const key of allowed) if (Object.hasOwn(req.body, key)) data.settings[key] = req.body[key];
       data.settings.adminPort = Number(data.settings.adminPort);
@@ -128,10 +158,18 @@ app.get('/api/cloudflare/tunnels', async (req, res) => {
   try { res.json({ ok: true, tunnels: await cloudflare.listTunnels() }); } catch (error) { apiError(res, error); }
 });
 app.post('/api/cloudflare/tunnel/create', async (req, res) => {
-  try { res.json({ ok: true, cloudflare: await cloudflare.createTunnel(req.body.name) }); } catch (error) { apiError(res, error); }
+  try {
+    await cloudflare.createTunnel(req.body.name);
+    const synced = await cloudflare.syncPublishedDomains();
+    res.json({ ok: true, synced, cloudflare: await cloudflare.status() });
+  } catch (error) { apiError(res, error); }
 });
 app.post('/api/cloudflare/tunnel/start', async (req, res) => {
-  try { res.json({ ok: true, cloudflare: await cloudflare.start() }); } catch (error) { apiError(res, error); }
+  try {
+    const synced = await cloudflare.syncPublishedDomains();
+    const status = await cloudflare.start();
+    res.json({ ok: true, synced, cloudflare: status });
+  } catch (error) { apiError(res, error); }
 });
 app.post('/api/cloudflare/tunnel/stop', async (req, res) => {
   try { res.json({ ok: true, cloudflare: await cloudflare.stop() }); } catch (error) { apiError(res, error); }
@@ -172,6 +210,7 @@ async function main() {
   await cloudflare.writeConfig().catch(() => {});
   await projects.startAutoProjects();
   if (store.get().settings.autoStartTunnel && store.get().cloudflare.tunnelId) {
+    await cloudflare.syncPublishedDomains().catch((error) => console.warn(`Domain sync skipped: ${error.message}`));
     await cloudflare.start().catch((error) => console.warn(`Tunnel auto-start skipped: ${error.message}`));
   }
   const settings = store.get().settings;

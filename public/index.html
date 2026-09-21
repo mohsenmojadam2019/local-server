@@ -164,7 +164,9 @@
           <label class="field"><span>پورت</span><input id="projectPort" class="input" type="number" min="1" max="65535" /></label>
           <label class="field"><span>Framework</span><input id="projectFramework" class="input" placeholder="nuxt / vite / laravel ..." /></label>
           <label class="field"><span>دامنه لوکال</span><input id="projectLocalHost" class="input ltr" placeholder="myapp.localhost" /></label>
+          <label class="field"><span>ساب‌دامین / دامنه عمومی</span><input id="projectPublicHost" class="input ltr" placeholder="app.example.com" /><small>مثلاً cinema.example.com</small></label>
           <label class="field"><span>CDN Preset</span><select id="projectCdn" class="input"><option value="off">خاموش</option><option value="standard">استاندارد</option><option value="aggressive">تهاجمی</option></select></label>
+          <label class="switch-field"><div><b>انتشار روی اینترنت</b><small>ساب‌دامین بالا از طریق Tunnel به همین پروژه Route شود</small></div><input id="projectPublishEnabled" type="checkbox" /></label>
           <label class="switch-field"><div><b>اجرای خودکار</b><small>همراه Local Server Pro</small></div><input id="projectAutoStart" type="checkbox" /></label>
           <label class="switch-field"><div><b>Restart خودکار</b><small>در صورت Crash شدن پردازش</small></div><input id="projectAutoRestart" type="checkbox" checked /></label>
         </div>
