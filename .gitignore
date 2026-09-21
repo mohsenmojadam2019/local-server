@@ -5,3 +5,4 @@ local-server-data/
 .env
 .DS_Store
 dist/
+bin/

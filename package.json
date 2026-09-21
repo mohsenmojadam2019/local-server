@@ -1,6 +1,6 @@
 {
   "name": "local-server-pro",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Professional local project manager, reverse proxy and Cloudflare Tunnel control panel with Persian RTL UI.",
   "type": "commonjs",
@@ -8,11 +8,11 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "check": "node --check src/index.js && node --check src/project-manager.js && node --check src/proxy-manager.js && node --check src/cloudflare-manager.js && node --check public/app.js",
+    "check": "node --check src/index.js && node --check src/config-store.js && node --check src/project-detector.js && node --check src/project-manager.js && node --check src/proxy-manager.js && node --check src/cloudflare-manager.js && node --check public/app.js",
     "test": "node --test"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5"
   },
   "dependencies": {
     "express": "^4.21.2",

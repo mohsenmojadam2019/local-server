@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 const kill = require('tree-kill');
 const pidusage = require('pidusage');
 const { detectProject } = require('./project-detector');
-const { safeProjectId, slugify, pathExists, findAvailablePort, requestHealth, normalizeHost } = require('./utils');
+const { safeProjectId, slugify, pathExists, isPortAvailable, requestHealth, normalizeHost } = require('./utils');
 
 class ProjectManager extends EventEmitter {
   constructor(store) {
@@ -68,8 +68,9 @@ class ProjectManager extends EventEmitter {
 
   allHostsForProject(project) {
     const localHost = normalizeHost(project.localHost || `${project.slug}.localhost`);
+    const publicHost = normalizeHost(project.publicHost || '');
     const custom = Array.isArray(project.domains) ? project.domains.map((d) => normalizeHost(d.hostname || d)).filter(Boolean) : [];
-    return [localHost, ...custom];
+    return [...new Set([localHost, publicHost, ...custom].filter(Boolean))];
   }
 
   validateUniqueHosts(candidate, excludingId = null) {
@@ -87,11 +88,23 @@ class ProjectManager extends EventEmitter {
     return detectProject(projectPath, port);
   }
 
+  async choosePort(preferred) {
+    const used = new Set((this.store.get().projects || []).map((p) => Number(p.port)).filter(Boolean));
+    for (let port = Number(preferred) || 3000; port <= 65000; port += 1) {
+      if (!used.has(port) && await isPortAvailable(port)) return port;
+    }
+    throw new Error('هیچ پورت آزادی برای پروژه جدید پیدا نشد.');
+  }
+
   async create(input) {
     const projectPath = path.resolve(String(input.path || '').trim());
     if (!(await pathExists(projectPath))) throw new Error('پوشه پروژه پیدا نشد.');
     const detected = detectProject(projectPath, Number(input.port) || undefined);
-    const port = Number(input.port) || await findAvailablePort(detected.suggestedPort || 3000);
+    const requestedPort = Number(input.port);
+    const port = requestedPort || await this.choosePort(detected.suggestedPort || 3000);
+    if (requestedPort && (this.store.get().projects || []).some((p) => Number(p.port) === requestedPort)) {
+      throw new Error(`پورت ${requestedPort} قبلاً برای پروژه دیگری رزرو شده است.`);
+    }
     const slug = slugify(input.slug || input.name || path.basename(projectPath));
     const project = {
       id: safeProjectId(),
@@ -102,6 +115,8 @@ class ProjectManager extends EventEmitter {
       command: String(input.command || detected.command || '').trim(),
       port,
       localHost: normalizeHost(input.localHost || `${slug}.localhost`),
+      publicHost: normalizeHost(input.publicHost || ''),
+      publishEnabled: Boolean(input.publishEnabled),
       domains: Array.isArray(input.domains) ? input.domains : [],
       autoStart: Boolean(input.autoStart),
       autoRestart: input.autoRestart !== false,
@@ -112,6 +127,7 @@ class ProjectManager extends EventEmitter {
       updatedAt: new Date().toISOString(),
     };
     if (!project.command) throw new Error('دستور اجرای پروژه مشخص نیست.');
+    if (project.publishEnabled && !project.publicHost) throw new Error('برای انتشار عمومی، ساب‌دامین/دامنه عمومی را وارد کنید.');
     this.validateUniqueHosts(project);
     await this.store.mutate((data) => data.projects.push(project));
     this.emit('projects', this.list());
@@ -130,10 +146,13 @@ class ProjectManager extends EventEmitter {
       port: patch.port ? Number(patch.port) : current.port,
       slug: patch.slug ? slugify(patch.slug) : current.slug,
       localHost: normalizeHost(patch.localHost || current.localHost),
+      publicHost: Object.hasOwn(patch, 'publicHost') ? normalizeHost(patch.publicHost || '') : normalizeHost(current.publicHost || ''),
+      publishEnabled: Object.hasOwn(patch, 'publishEnabled') ? Boolean(patch.publishEnabled) : Boolean(current.publishEnabled),
       domains: Array.isArray(patch.domains) ? patch.domains : current.domains,
       env: patch.env && typeof patch.env === 'object' ? patch.env : current.env,
       updatedAt: new Date().toISOString(),
     };
+    if (next.publishEnabled && !next.publicHost) throw new Error('برای انتشار عمومی، ساب‌دامین/دامنه عمومی را وارد کنید.');
     this.validateUniqueHosts(next, id);
     await this.store.mutate((data) => {
       const index = data.projects.findIndex((p) => p.id === id);

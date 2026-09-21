@@ -171,6 +171,9 @@ async function main() {
   await proxy.start();
   await cloudflare.writeConfig().catch(() => {});
   await projects.startAutoProjects();
+  if (store.get().settings.autoStartTunnel && store.get().cloudflare.tunnelId) {
+    await cloudflare.start().catch((error) => console.warn(`Tunnel auto-start skipped: ${error.message}`));
+  }
   const settings = store.get().settings;
   const server = app.listen(settings.adminPort, settings.adminHost, async () => {
     const url = `http://${settings.adminHost}:${settings.adminPort}`;
