@@ -21,7 +21,7 @@ test('hub routes authenticated MCP calls to an enrolled device', async (t) => {
     exp: Math.floor(Date.now() / 1000) + 60,
   }, process.env.GODCONTROL_DEVICE_HMAC_SECRET);
 
-  const ws = new WebSocket('ws://127.0.0.1:' + port + '/agent', {
+  const ws = new WebSocket('ws://127.0.0.1:' + port + '/agent/connect', {
     headers: { Authorization: 'Device ' + token },
   });
   await new Promise((resolve, reject) => {
@@ -60,6 +60,13 @@ test('hub routes authenticated MCP calls to an enrolled device', async (t) => {
     });
   };
 
+  const initRes = await post({
+    jsonrpc: '2.0', id: 0, method: 'initialize',
+    params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'test', version: '1' } },
+  }, false);
+  const initJson = await initRes.json();
+  assert.match(initJson.result.instructions, /read-only tools/i);
+
   const listRes = await post({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }, false);
   const listJson = await listRes.json();
   assert.equal(listJson.result.tools.length, 15);
@@ -77,4 +84,17 @@ test('hub routes authenticated MCP calls to an enrolled device', async (t) => {
   assert.match(unauthRes.headers.get('www-authenticate') || '', /oauth-protected-resource/);
   const unauthJson = await unauthRes.json();
   assert.ok(unauthJson.error.data._meta['mcp/www_authenticate']);
+
+  const malformed = await fetch('http://127.0.0.1:' + port + '/mcp', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{bad json',
+  });
+  assert.equal(malformed.status, 400);
+  const malformedJson = await malformed.json();
+  assert.equal(malformedJson.error.code, -32700);
+
+  const robots = await fetch('http://127.0.0.1:' + port + '/robots.txt');
+  assert.equal(robots.status, 200);
+  assert.match(await robots.text(), /Disallow: \/$/m);
 });
