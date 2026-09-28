@@ -37,7 +37,9 @@ class DeviceRegistry {
   }
 
   list(userId) {
-    return [...this.devices.values()].filter((d) => d.userId === userId).map(({ socket, ...d }) => ({ ...d, online: socket.readyState === 1 }));
+    return [...this.devices.values()]
+      .filter((d) => d.userId === userId)
+      .map((d) => ({ deviceId: d.deviceId, name: d.name, online: d.socket.readyState === 1 }));
   }
 
   sendPending(item) {
