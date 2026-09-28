@@ -25,7 +25,7 @@ class Policy {
   constructor(env = process.env) {
     this.readRoots = splitList(env.GODCONTROL_READ_ROOTS);
     this.writeRoots = splitList(env.GODCONTROL_WRITE_ROOTS);
-    this.commands = new Set(splitList(env.GODCONTROL_ALLOWED_COMMANDS));
+    this.programs = new Set(splitList(env.GODCONTROL_ALLOWED_PROGRAMS || env.GODCONTROL_ALLOWED_COMMANDS));
     this.maxFileBytes = Number(env.GODCONTROL_MAX_FILE_BYTES || 2_000_000);
     this.maxOutputBytes = Number(env.GODCONTROL_MAX_OUTPUT_BYTES || 1_000_000);
   }
@@ -42,9 +42,12 @@ class Policy {
     throw new Error('Path is outside the configured policy roots');
   }
 
-  assertCommand(command) {
-    const first = String(command || '').trim().split(/\s+/)[0];
-    if (!first || !this.commands.has(first)) throw new Error('Command is not allowed by device policy');
+  assertProgram(program) {
+    const value = String(program || '').trim();
+    if (!value || value.includes('/') || value.includes('\\\\') || !/^[A-Za-z0-9._+-]+$/.test(value)) {
+      throw new Error('Program must be a bare executable name');
+    }
+    if (!this.programs.has(value)) throw new Error('Program is not allowed by device policy');
     return true;
   }
 }
