@@ -12,7 +12,6 @@ test('hub routes authenticated MCP calls to an enrolled device', async (t) => {
 
   const { server } = require('../hub/server');
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => new Promise((resolve) => server.close(resolve)));
 
   const port = server.address().port;
   const token = signDeviceToken({
@@ -29,7 +28,16 @@ test('hub routes authenticated MCP calls to an enrolled device', async (t) => {
     ws.once('open', resolve);
     ws.once('error', reject);
   });
-  t.after(() => ws.close());
+  t.after(async () => {
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      await new Promise((resolve) => {
+        ws.once('close', resolve);
+        ws.close();
+        setTimeout(resolve, 500).unref();
+      });
+    }
+    await new Promise((resolve) => server.close(resolve));
+  });
 
   ws.on('message', (raw) => {
     const msg = JSON.parse(String(raw));
