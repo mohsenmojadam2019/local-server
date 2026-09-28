@@ -98,7 +98,10 @@ app.post('/mcp', async (req, res) => {
 
       let result;
       if (name === 'whoami') {
-        result = { userId: identity.sub, email: identity.email, email_verified: identity.email_verified === true };
+        result = { id: identity.sub };
+        if (identity.claims?.name) result.name = String(identity.claims.name);
+        if (identity.email) result.email = identity.email;
+        if (identity.claims?.nickname) result.nickname = String(identity.claims.nickname);
       } else if (name === 'devices_list') {
         result = { devices: registry.list(identity.sub) };
       } else {
@@ -111,9 +114,12 @@ app.post('/mcp', async (req, res) => {
         }
       }
 
+      const structured = result && typeof result === 'object' && !Array.isArray(result)
+        ? result
+        : { result };
       return res.json(rpcResult(id, {
-        content: [{ type: 'text', text: JSON.stringify(result) }],
-        structuredContent: result,
+        content: [{ type: 'text', text: JSON.stringify(structured) }],
+        structuredContent: structured,
         isError: false,
       }));
     }
