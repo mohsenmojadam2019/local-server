@@ -3,6 +3,7 @@
 const { WebSocket } = require('ws');
 const { Policy } = require('./policy');
 const { LocalMcpClient } = require('./local-mcp');
+const { SafeProcessManager } = require('./process-manager');
 const { LOCAL_MAPPING } = require('../shared/tools');
 
 const HUB = process.env.GODCONTROL_HUB_WS || 'ws://127.0.0.1:8790/agent';
@@ -15,6 +16,10 @@ if (!LOCAL_TOKEN) throw new Error('GODCONTROL_LOCAL_TOKEN is required');
 
 const policy = new Policy();
 const local = new LocalMcpClient({ url: LOCAL_URL, token: LOCAL_TOKEN });
+const processes = new SafeProcessManager({
+  maxOutputBytes: policy.maxOutputBytes,
+  timeoutMs: Number(process.env.GODCONTROL_PROCESS_TIMEOUT_MS || 120000),
+});
 const completed = new Map();
 let backoff = 1000;
 
@@ -25,7 +30,7 @@ async function authorizeTool(tool, args) {
   if (['git_status','git_diff'].includes(tool)) await policy.assertPath(args.repoPath, false);
   if (writeTools.has(tool)) await policy.assertPath(args.path, true);
   if (tool === 'process_start') {
-    policy.assertCommand(args.command);
+    policy.assertProgram(args.program);
     if (args.cwd) await policy.assertPath(args.cwd, false);
   }
   if (tool === 'fs_read' && args.maxBytes && args.maxBytes > policy.maxFileBytes) throw new Error('maxBytes exceeds device policy');
@@ -46,6 +51,13 @@ function mapCall(tool, args) {
 
 async function execute(tool, args) {
   await authorizeTool(tool, args || {});
+  if (tool === 'process_start') {
+    const cwd = args.cwd ? await policy.assertPath(args.cwd, false) : undefined;
+    return processes.start({ program: args.program, args: args.args || [], cwd, policy });
+  }
+  if (tool === 'process_read') {
+    return processes.read(args);
+  }
   const mapped = mapCall(tool, args || {});
   return local.call(mapped.localTool, mapped.args);
 }
