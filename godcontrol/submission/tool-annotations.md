@@ -12,7 +12,7 @@
 | search | true | false | false | files:read | Searches only configured private roots. |
 | git_status | true | false | false | git:read | Reads repository status. |
 | git_diff | true | false | false | git:read | Reads repository changes. |
-| process_start | false | false | false | process:run | Starts an allowlisted process, changing runtime state without inherently causing irreversible external effects. |
+| process_start | false | true | true | process:run | Starts an allowlisted local process. Allowed programs can still access public networks or perform difficult-to-reverse actions depending on arguments, so ChatGPT must treat it as open-world and destructive. The device agent enforces an executable allowlist and approved cwd before execution. |
 | process_read | true | false | false | process:run | Reads output from an existing process session. |
 | file_write | false | false | false | files:write | Creates or updates data only inside an explicitly writable root. |
 | file_edit | false | false | false | files:write | Applies an exact-text edit only inside an explicitly writable root. |
