@@ -11,9 +11,6 @@ const DEVICE_TOKEN = process.env.GODCONTROL_DEVICE_TOKEN;
 const LOCAL_URL = process.env.GODCONTROL_LOCAL_MCP || 'http://127.0.0.1:8787/mcp';
 const LOCAL_TOKEN = process.env.GODCONTROL_LOCAL_TOKEN;
 
-if (!DEVICE_TOKEN) throw new Error('GODCONTROL_DEVICE_TOKEN is required');
-if (!LOCAL_TOKEN) throw new Error('GODCONTROL_LOCAL_TOKEN is required');
-
 const policy = new Policy();
 const local = new LocalMcpClient({ url: LOCAL_URL, token: LOCAL_TOKEN });
 const processEnvAllowlist = String(process.env.GODCONTROL_PROCESS_ENV_ALLOWLIST || '')
@@ -28,18 +25,33 @@ const processes = new SafeProcessManager({
 const completed = new Map();
 let backoff = 1000;
 
-async function authorizeTool(tool, args) {
+async function sanitizeArgs(tool, args, currentPolicy = policy) {
+  const safe = { ...(args || {}) };
   const writeTools = new Set(['file_write', 'file_edit', 'file_remove']);
-  if (['list_directory','get_file_info','fs_read'].includes(tool)) await policy.assertPath(args.path, false);
-  if (tool === 'search') await policy.assertPath(args.root, false);
-  if (['git_status','git_diff'].includes(tool)) await policy.assertPath(args.repoPath, false);
-  if (writeTools.has(tool)) await policy.assertPath(args.path, true);
-  if (tool === 'process_start') {
-    policy.assertProgram(args.program);
-    if (args.cwd) await policy.assertPath(args.cwd, false);
+
+  if (['list_directory', 'get_file_info', 'fs_read'].includes(tool)) {
+    safe.path = await currentPolicy.assertPath(safe.path, false);
   }
-  if (tool === 'fs_read' && args.maxBytes && args.maxBytes > policy.maxFileBytes) throw new Error('maxBytes exceeds device policy');
-  if (tool === 'process_read' && args.length && args.length > policy.maxOutputBytes) throw new Error('length exceeds device policy');
+  if (tool === 'search') {
+    safe.root = await currentPolicy.assertPath(safe.root, false);
+  }
+  if (['git_status', 'git_diff'].includes(tool)) {
+    safe.repoPath = await currentPolicy.assertPath(safe.repoPath, false);
+  }
+  if (writeTools.has(tool)) {
+    safe.path = await currentPolicy.assertPath(safe.path, true);
+  }
+  if (tool === 'process_start') {
+    currentPolicy.assertProgram(safe.program);
+    if (safe.cwd) safe.cwd = await currentPolicy.assertPath(safe.cwd, false);
+  }
+  if (tool === 'fs_read' && safe.maxBytes && safe.maxBytes > currentPolicy.maxFileBytes) {
+    throw new Error('maxBytes exceeds device policy');
+  }
+  if (tool === 'process_read' && safe.length && safe.length > currentPolicy.maxOutputBytes) {
+    throw new Error('length exceeds device policy');
+  }
+  return safe;
 }
 
 function mapCall(tool, args) {
@@ -58,19 +70,20 @@ function mapCall(tool, args) {
 }
 
 async function execute(tool, args) {
-  await authorizeTool(tool, args || {});
+  const safe = await sanitizeArgs(tool, args || {});
   if (tool === 'process_start') {
-    const cwd = args.cwd ? await policy.assertPath(args.cwd, false) : undefined;
-    return processes.start({ program: args.program, args: args.args || [], cwd, policy });
+    return processes.start({ program: safe.program, args: safe.args || [], cwd: safe.cwd, policy });
   }
   if (tool === 'process_read') {
-    return processes.read(args);
+    return processes.read(safe);
   }
-  const mapped = mapCall(tool, args || {});
+  const mapped = mapCall(tool, safe);
   return local.call(mapped.localTool, mapped.args);
 }
 
 function connect() {
+  if (!DEVICE_TOKEN) throw new Error('GODCONTROL_DEVICE_TOKEN is required');
+  if (!LOCAL_TOKEN) throw new Error('GODCONTROL_LOCAL_TOKEN is required');
   const ws = new WebSocket(HUB, { headers: { Authorization: 'Device ' + DEVICE_TOKEN } });
 
   ws.on('open', () => {
@@ -110,4 +123,6 @@ function connect() {
   ws.on('error', () => { try { ws.close(); } catch {} });
 }
 
-connect();
+if (require.main === module) connect();
+
+module.exports = { sanitizeArgs, mapCall, execute, connect };

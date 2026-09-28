@@ -29,6 +29,16 @@ const registry = new DeviceRegistry({ timeoutMs: Number(process.env.GODCONTROL_C
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '2mb' }));
+app.use((error, _req, res, next) => {
+  if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
+    return res.status(400).json({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32700, message: 'Parse error' },
+    });
+  }
+  return next(error);
+});
 
 function page(title, body) {
   return '<!doctype html><meta charset="utf-8"><title>' + title + '</title><style>body{font:16px system-ui;max-width:760px;margin:60px auto;padding:0 20px;line-height:1.7;color:#172033}code{background:#eef2f7;padding:2px 5px;border-radius:5px}</style><h1>' + title + '</h1>' + body;
@@ -39,6 +49,7 @@ app.get('/privacy', (_req, res) => res.type('html').send(page('GodControl Privac
 app.get('/terms', (_req, res) => res.type('html').send(page('GodControl Terms', '<p>You may connect only devices and accounts you are authorized to control. Device policy limits file paths and executable commands.</p>')));
 app.get('/support', (_req, res) => res.type('html').send(page('GodControl Support', '<p>For support, use the project issue tracker or the publisher contact listed in the plugin directory.</p>')));
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'godcontrol-hub', version: '0.1.0' }));
+app.get('/robots.txt', (_req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /\n'));
 
 app.get('/.well-known/openai-apps-challenge', (_req, res) => {
   const token = process.env.OPENAI_APPS_CHALLENGE;
@@ -82,6 +93,7 @@ app.post('/mcp', async (req, res) => {
         protocolVersion: '2025-03-26',
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'GodControl', version: '0.1.0' },
+        instructions: 'Use read-only tools to inspect the selected enrolled device before making changes. File writes, removals, and process starts are policy-bounded and may require host confirmation. Never request paths or executables outside the device policy.',
       }));
     }
     if (msg.method === 'notifications/initialized') return res.status(204).end();
@@ -141,7 +153,7 @@ const wss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, PUBLIC_ORIGIN);
-  if (url.pathname !== '/agent') return socket.destroy();
+  if (url.pathname !== '/agent' && url.pathname !== '/agent/connect') return socket.destroy();
   const auth = req.headers.authorization || '';
   if (!auth.startsWith('Device ')) return socket.destroy();
   let claims;
