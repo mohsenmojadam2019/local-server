@@ -7,6 +7,8 @@ const { TOOLS } = require('../shared/tools');
 test('all tools have OpenAI review annotations and security schemes', () => {
   assert.equal(TOOLS.length, 15);
   for (const t of TOOLS) {
+    assert.equal(typeof t.title, 'string', t.name);
+    assert.ok(t.title.trim().length > 0, t.name);
     assert.equal(typeof t.annotations?.readOnlyHint, 'boolean', t.name);
     assert.equal(typeof t.annotations?.openWorldHint, 'boolean', t.name);
     assert.equal(typeof t.annotations?.destructiveHint, 'boolean', t.name);
