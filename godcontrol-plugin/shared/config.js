@@ -20,6 +20,10 @@ export function loadConfig(env = process.env) {
     accessTtlMs: positive(env.ACCESS_TOKEN_TTL_SECONDS, 900) * 1000,
     refreshTtlMs: positive(env.REFRESH_TOKEN_TTL_SECONDS, 2_592_000) * 1000,
     maxResultBytes: positive(env.MAX_RESULT_BYTES, 120_000),
+    trustProxy: env.TRUST_PROXY === "loopback",
+    supportEmail: env.SUPPORT_EMAIL ?? "",
+    publisherName: env.PUBLISHER_NAME ?? "GodControl operator",
+    websiteUrl: env.WEBSITE_URL ?? base.replace(/\/mcp$/, ""),
     secureCookies: (env.NODE_ENV ?? "development") === "production",
   };
   if (config.nodeEnv === "production") {

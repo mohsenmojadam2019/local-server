@@ -7,5 +7,8 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (token_hash text primary key, user_id 
 CREATE TABLE IF NOT EXISTS devices (id text primary key, user_id text not null, name text not null, token_hash text unique not null, status jsonb not null default '{}', created_at timestamptz not null default now(), last_seen_at timestamptz);
 CREATE TABLE IF NOT EXISTS enrollment_codes (code_hash text primary key, user_id text not null, expires_at timestamptz not null, used_at timestamptz);
 CREATE TABLE IF NOT EXISTS remote_calls (id text primary key, user_id text not null, device_id text not null, tool text not null, args jsonb not null, status text not null check(status in ('pending','executing','completed','failed','expired')), idempotency_key text, result jsonb, error text, created_at timestamptz not null, expires_at timestamptz not null, claimed_at timestamptz, completed_at timestamptz);
-CREATE UNIQUE INDEX IF NOT EXISTS remote_calls_user_idempotency ON remote_calls(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+DROP INDEX IF EXISTS remote_calls_user_idempotency;
+CREATE UNIQUE INDEX IF NOT EXISTS remote_calls_user_device_tool_idempotency ON remote_calls(user_id, device_id, tool, idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS remote_calls_expiry_status ON remote_calls(status, expires_at);
+CREATE INDEX IF NOT EXISTS audit_log_user_created ON audit_log(user_id, created_at);
 CREATE TABLE IF NOT EXISTS audit_log (id bigserial primary key, user_id text, device_id text, call_id text, event text not null, metadata jsonb not null default '{}', created_at timestamptz not null default now());

@@ -21,9 +21,9 @@ export class MemoryStore {
   async listDevices(userId) { return [...this.devices.values()].filter(d => d.userId === userId).map(({ tokenHash, ...safe }) => safe); }
   async getDevice(userId, id) { const d = this.devices.get(id); return d?.userId === userId ? d : null; }
   async enqueueCall(call) { if (this.calls.has(call.id)) return this.calls.get(call.id); this.calls.set(call.id, call); return call; }
-  async getCall(id) { return this.calls.get(id); }
-  async claimPending(deviceId) { const result = []; for (const c of this.calls.values()) if (c.deviceId === deviceId && (c.status === "pending" || (c.status === "executing" && c.claimedAt < Date.now() - 120_000))) { c.status = "executing"; c.claimedAt = Date.now(); result.push(c); } return result; }
-  async completeCall(id, status, result, error) { const c = this.calls.get(id); if (!c || (c.status !== "executing" && c.status !== "pending")) return c; c.status = status; c.result = result; c.error = error; c.completedAt = Date.now(); return c; }
+  async getCall(id) { const c = this.calls.get(id); if (c && c.expiresAt <= Date.now() && (c.status === "pending" || c.status === "executing")) { c.status = "expired"; c.error = "call expired"; c.completedAt = Date.now(); } return c; }
+  async claimPending(deviceId) { const now = Date.now(); const result = []; for (const c of this.calls.values()) { if (c.expiresAt <= now && (c.status === "pending" || c.status === "executing")) { c.status = "expired"; c.error = "call expired"; c.completedAt = now; continue; } if (c.deviceId === deviceId && (c.status === "pending" || (c.status === "executing" && c.claimedAt < now - 120_000))) { c.status = "executing"; c.claimedAt = now; result.push(c); } } return result; }
+  async completeCall(id, status, result, error) { const c = this.calls.get(id); if (!c || (c.status !== "executing" && c.status !== "pending")) return c; if (c.expiresAt <= Date.now()) { c.status = "expired"; c.error = "call expired"; c.completedAt = Date.now(); return c; } c.status = status; c.result = result; c.error = error; c.completedAt = Date.now(); return c; }
   async auditEvent(event) { this.audit.push({ ...event, at: Date.now() }); }
 }
 

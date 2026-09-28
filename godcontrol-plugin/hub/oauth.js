@@ -8,7 +8,7 @@ const html = (s) => String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").r
 
 export class OAuthService {
   constructor(store, config) { this.store = store; this.config = config; }
-  metadata() { return { issuer: this.config.issuer, authorization_endpoint: `${this.config.issuer}/oauth/authorize`, token_endpoint: `${this.config.issuer}/oauth/token`, registration_endpoint: `${this.config.issuer}/oauth/register`, userinfo_endpoint: `${this.config.issuer}/oauth/userinfo`, response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none"], scopes_supported: SCOPES, client_id_metadata_document_supported: false, resource_indicators_supported: true, authorization_response_iss_parameter_supported: true }; }
+  metadata() { return { issuer: this.config.issuer, authorization_endpoint: `${this.config.issuer}/oauth/authorize`, token_endpoint: `${this.config.issuer}/oauth/token`, registration_endpoint: `${this.config.issuer}/oauth/register`, userinfo_endpoint: `${this.config.issuer}/oauth/userinfo`, response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none"], scopes_supported: SCOPES, client_id_metadata_document_supported: false, resource_indicators_supported: true, authorization_response_iss_parameter_supported: false }; }
   protectedResource() { return { resource: this.config.resource, authorization_servers: [this.config.issuer], scopes_supported: SCOPES, bearer_methods_supported: ["header"] }; }
   async register(input) {
     const uris = Array.isArray(input.redirect_uris) ? input.redirect_uris : [];
@@ -31,22 +31,24 @@ export class OAuthService {
     this.validateAuthorize(body); if (!body.csrf || body.csrf !== cookies.gc_oauth_csrf) throw new Error("invalid CSRF token"); if (body.approved !== "yes") throw new Error("consent required");
     const client = await this.store.getClient(body.client_id); if (!client || !client.redirect_uris.includes(body.redirect_uri)) throw new Error("invalid client or redirect_uri");
     const user = await this.store.getUserByEmail(body.email); if (!user || !(await passwordVerify(body.password, user.passwordHash))) throw new Error("invalid credentials");
-    const code = randomToken(32); await this.store.saveAuthCode({ codeHash: hashToken(code), clientId: client.client_id, userId: user.id, redirectUri: body.redirect_uri, resource: body.resource, scope: parseScopes(body.scope).join(" "), codeChallenge: body.code_challenge, expiresAt: Date.now() + 60_000 });
-    const url = new URL(body.redirect_uri); url.searchParams.set("code", code); url.searchParams.set("state", body.state); url.searchParams.set("iss", this.config.issuer); return url;
+    const code = randomToken(32); await this.store.saveAuthCode({ codeHash: hashToken(code), clientId: client.client_id, userId: user.id, redirectUri: body.redirect_uri, resource: body.resource, scope: parseScopes(body.scope).join(" "), codeChallenge: body.code_challenge, expiresAt: Date.now() + 60_000 }); await this.store.auditEvent({ userId: user.id, event: "oauth_authorization_code_issued", metadata: { clientId: client.client_id, scope: parseScopes(body.scope) } });
+    const url = new URL(body.redirect_uri); url.searchParams.set("code", code); url.searchParams.set("state", body.state); return url;
   }
   async token(body) {
     if (body.grant_type === "authorization_code") {
       if (!body.code || !body.client_id || !body.redirect_uri || !body.code_verifier) throw new Error("invalid token request");
-      const record = await this.store.consumeAuthCode(hashToken(body.code)); if (!record || record.clientId !== body.client_id || record.redirectUri !== body.redirect_uri || pkce(body.code_verifier) !== record.codeChallenge) throw new Error("invalid authorization code");
-      return await this.issue(record.userId, record.clientId, record.resource, record.scope);
+      if (body.resource !== this.config.resource) throw new Error("invalid resource");
+      const record = await this.store.consumeAuthCode(hashToken(body.code)); if (!record || record.clientId !== body.client_id || record.redirectUri !== body.redirect_uri || record.resource !== body.resource || pkce(body.code_verifier) !== record.codeChallenge) throw new Error("invalid authorization code");
+      const issued = await this.issue(record.userId, record.clientId, record.resource, record.scope); await this.store.auditEvent({ userId: record.userId, event: "oauth_access_issued", metadata: { clientId: record.clientId, resource: record.resource } }); return issued;
     }
     if (body.grant_type === "refresh_token") {
-      const old = await this.store.getRefresh(body.refresh_token); if (!old || old.revokedAt || old.expiresAt < Date.now()) throw new Error("invalid refresh token");
-      const result = await this.issue(old.userId, old.clientId, old.resource, old.scope); const rotated = await this.store.rotateRefresh(body.refresh_token, { tokenHash: hashToken(result.refresh_token), userId: old.userId, clientId: old.clientId, resource: old.resource, scope: old.scope, expiresAt: Date.now() + this.config.refreshTtlMs }); if (!rotated) throw new Error("invalid refresh token"); return result;
+      if (body.resource !== undefined && body.resource !== this.config.resource) throw new Error("invalid resource");
+      const old = await this.store.getRefresh(body.refresh_token); if (!old || old.revokedAt || old.expiresAt < Date.now() || old.resource !== this.config.resource) throw new Error("invalid refresh token");
+      const result = await this.issue(old.userId, old.clientId, old.resource, old.scope, { saveRefresh: false }); const rotated = await this.store.rotateRefresh(body.refresh_token, { tokenHash: hashToken(result.refresh_token), userId: old.userId, clientId: old.clientId, resource: old.resource, scope: old.scope, expiresAt: Date.now() + this.config.refreshTtlMs }); if (!rotated) throw new Error("invalid refresh token"); await this.store.auditEvent({ userId: old.userId, event: "oauth_refresh_rotated", metadata: { clientId: old.clientId, resource: old.resource } }); return result;
     }
     throw new Error("unsupported grant_type");
   }
-  async issue(userId, clientId, resource, scope) { const access_token = randomToken(32); const refresh_token = randomToken(48); await this.store.saveAccess({ tokenHash: hashToken(access_token), userId, clientId, resource, scope, expiresAt: Date.now() + this.config.accessTtlMs }); await this.store.saveRefresh({ tokenHash: hashToken(refresh_token), userId, clientId, resource, scope, expiresAt: Date.now() + this.config.refreshTtlMs }); return { access_token, token_type: "Bearer", expires_in: Math.floor(this.config.accessTtlMs / 1000), refresh_token, scope }; }
+  async issue(userId, clientId, resource, scope, { saveRefresh = true } = {}) { const access_token = randomToken(32); const refresh_token = randomToken(48); await this.store.saveAccess({ tokenHash: hashToken(access_token), userId, clientId, resource, scope, expiresAt: Date.now() + this.config.accessTtlMs }); if (saveRefresh) await this.store.saveRefresh({ tokenHash: hashToken(refresh_token), userId, clientId, resource, scope, expiresAt: Date.now() + this.config.refreshTtlMs }); return { access_token, token_type: "Bearer", expires_in: Math.floor(this.config.accessTtlMs / 1000), refresh_token, scope }; }
   async authenticate(header, resource) { if (!header?.startsWith("Bearer ")) return null; const token = await this.store.getAccess(header.slice(7)); return token?.resource === resource ? token : null; }
   async userinfo(token) { const user = await this.store.getUser(token.userId); return { sub: user.id, email: user.email, email_verified: Boolean(user.emailVerified) }; }
 }
