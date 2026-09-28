@@ -35,3 +35,23 @@ jobs:
         run: |
           npm run check
           npm test
+
+      - name: MCP Inspector compatibility
+        working-directory: godcontrol
+        env:
+          NODE_ENV: test
+          GODCONTROL_DEV_AUTH: "true"
+          GODCONTROL_DEVICE_HMAC_SECRET: ci-device-secret
+          HOST: 127.0.0.1
+          PORT: "8790"
+          PUBLIC_ORIGIN: http://127.0.0.1:8790
+        run: |
+          node hub/server.js > /tmp/godcontrol-ci-hub.log 2>&1 &
+          HUB_PID=$!
+          trap 'kill "$HUB_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8790/health >/dev/null && break
+            sleep 0.2
+          done
+          npx --yes @modelcontextprotocol/inspector@2.5.0 --cli             http://127.0.0.1:8790/mcp --transport http --method tools/list --format json             | tee /tmp/godcontrol-tools.json
+          node -e 'const fs=require("fs");const d=JSON.parse(fs.readFileSync("/tmp/godcontrol-tools.json","utf8"));if(d.result.tools.length!==15)process.exit(1)'
