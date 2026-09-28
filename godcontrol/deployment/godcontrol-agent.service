@@ -2,15 +2,19 @@
 Description=GodControl Device Agent
 After=network-online.target godcontrol-mcp.service
 Wants=network-online.target
+ConditionPathExists=%h/.config/godcontrol/device-oauth.json
 
 [Service]
 Type=simple
 WorkingDirectory=%h/local-server/godcontrol
-EnvironmentFile=%h/.config/godcontrol/agent.env
+EnvironmentFile=%h/godcontrol-mcp/.env
+EnvironmentFile=-%h/.config/godcontrol/agent.env
 ExecStart=/usr/bin/node agent/index.js
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
 
 [Install]
 WantedBy=default.target
