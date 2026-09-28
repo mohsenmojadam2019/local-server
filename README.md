@@ -1,5 +1,7 @@
 # Local Server Pro
 
+For the optional public GodControl MCP hub and outbound agent, see [godcontrol-plugin/README.md](godcontrol-plugin/README.md).
+
 پنل حرفه‌ای فارسی برای تبدیل سیستم توسعه به یک **Local Application Server**: اجرای هم‌زمان پروژه‌ها، Reverse Proxy بر اساس Domain، دامنه عمومی، Cloudflare Tunnel، CDN preset، WebSocket/HMR، Health Check، Live Log و مانیتورینگ CPU/RAM.
 
 ## قابلیت‌ها

@@ -1,0 +1,15 @@
+[Unit]
+Description=GodControl outbound-only local agent
+After=network-online.target godcontrol-mcp.service
+
+[Service]
+WorkingDirectory=/opt/godcontrol-plugin
+EnvironmentFile=/etc/godcontrol-agent/config.env
+ExecStart=/usr/bin/node agent/main.js
+Restart=always
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=false
+
+[Install]
+WantedBy=multi-user.target

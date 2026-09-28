@@ -1,0 +1,17 @@
+[Unit]
+Description=GodControl public MCP OAuth hub
+After=docker.service
+
+[Service]
+WorkingDirectory=/opt/godcontrol-plugin
+EnvironmentFile=/opt/godcontrol-plugin/.env
+ExecStart=/usr/bin/node hub/server.js
+Restart=always
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/godcontrol-plugin
+
+[Install]
+WantedBy=multi-user.target

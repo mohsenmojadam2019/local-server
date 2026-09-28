@@ -1,0 +1,17 @@
+services:
+  hub:
+    build: .
+    env_file: .env
+    ports: ["127.0.0.1:19091:19091"]
+    depends_on: [postgres]
+    restart: unless-stopped
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: godcontrol
+      POSTGRES_USER: godcontrol
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes: [godcontrol_pg:/var/lib/postgresql/data]
+    restart: unless-stopped
+volumes:
+  godcontrol_pg:
