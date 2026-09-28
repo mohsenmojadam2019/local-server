@@ -9,8 +9,10 @@ test('startsWithin rejects traversal siblings', () => {
   assert.equal(startsWithin('/tmp/root2/a.txt', '/tmp/root'), false);
 });
 
-test('command allowlist is exact on executable token', () => {
-  const p = new Policy({ GODCONTROL_ALLOWED_COMMANDS: 'git,node', GODCONTROL_READ_ROOTS: '/tmp', GODCONTROL_WRITE_ROOTS: '/tmp' });
-  assert.equal(p.assertCommand('git status'), true);
-  assert.throws(() => p.assertCommand('bash -lc whoami'), /not allowed/);
+test('program allowlist accepts only configured bare executable names', () => {
+  const p = new Policy({ GODCONTROL_ALLOWED_PROGRAMS: 'git,node', GODCONTROL_READ_ROOTS: '/tmp', GODCONTROL_WRITE_ROOTS: '/tmp' });
+  assert.equal(p.assertProgram('git'), true);
+  assert.throws(() => p.assertProgram('bash'), /not allowed/);
+  assert.throws(() => p.assertProgram('/usr/bin/git'), /bare executable/);
+  assert.throws(() => p.assertProgram('git;rm'), /bare executable/);
 });
