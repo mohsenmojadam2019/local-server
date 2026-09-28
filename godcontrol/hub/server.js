@@ -154,17 +154,36 @@ app.post('/mcp', async (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
-server.on('upgrade', (req, socket, head) => {
+function validateDeviceIdentity(deviceId, name) {
+  const id = String(deviceId || '');
+  if (!/^[A-Za-z0-9._-]{1,128}$/.test(id)) throw new Error('Invalid device id');
+  const displayName = String(name || id).trim().slice(0, 120) || id;
+  return { deviceId: id, name: displayName };
+}
+
+server.on('upgrade', async (req, socket, head) => {
   const url = new URL(req.url, PUBLIC_ORIGIN);
   if (url.pathname !== '/agent' && url.pathname !== '/agent/connect') return socket.destroy();
-  const auth = req.headers.authorization || '';
-  if (!auth.startsWith('Device ')) return socket.destroy();
+  const authorization = req.headers.authorization || '';
   let claims;
   try {
-    claims = verifyDeviceToken(auth.slice(7), process.env.GODCONTROL_DEVICE_HMAC_SECRET);
+    if (authorization.startsWith('Device ')) {
+      claims = verifyDeviceToken(authorization.slice(7), process.env.GODCONTROL_DEVICE_HMAC_SECRET);
+    } else if (authorization.startsWith('Bearer ')) {
+      const identity = await authenticate(req);
+      requireScopes(identity, ['devices:connect']);
+      const device = validateDeviceIdentity(
+        url.searchParams.get('device_id'),
+        url.searchParams.get('name'),
+      );
+      claims = { userId: identity.sub, ...device };
+    } else {
+      return socket.destroy();
+    }
   } catch {
     return socket.destroy();
   }
+
   wss.handleUpgrade(req, socket, head, (ws) => {
     ws.godcontrol = claims;
     wss.emit('connection', ws, req);
