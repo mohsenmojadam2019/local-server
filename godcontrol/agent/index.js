@@ -43,6 +43,9 @@ async function authorizeTool(tool, args) {
 }
 
 function mapCall(tool, args) {
+  if (tool === 'file_write') {
+    return { localTool: 'fs_write', args: { path: args.path, content: args.content, mode: 'rewrite' } };
+  }
   if (tool === 'search') {
     const localTool = args.mode === 'files' ? 'search_files' : 'search_content';
     const mapped = { root: args.root, pattern: args.pattern, maxResults: args.maxResults };
