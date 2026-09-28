@@ -1,0 +1,9 @@
+[Unit]
+Description=Start GodControl Device Agent after enrollment
+
+[Path]
+PathExists=%h/.config/godcontrol/device-oauth.json
+Unit=godcontrol-agent.service
+
+[Install]
+WantedBy=default.target
