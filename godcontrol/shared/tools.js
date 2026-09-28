@@ -2,29 +2,45 @@
 
 const oauth = (scopes) => [{ type: 'oauth2', scopes }];
 
-function tool(name, description, scope, inputSchema, annotations) {
+function tool(name, description, scope, inputSchema, annotations, extra = {}) {
   const securitySchemes = oauth([scope]);
   return {
     name,
     description,
     inputSchema,
+    outputSchema: { type: 'object', additionalProperties: true },
     securitySchemes,
     annotations,
     _meta: { securitySchemes },
+    ...extra,
   };
 }
 
 const RO = { readOnlyHint: true, openWorldHint: false, destructiveHint: false };
 const WRITE = { readOnlyHint: false, openWorldHint: false, destructiveHint: false };
 const DESTRUCTIVE = { readOnlyHint: false, openWorldHint: false, destructiveHint: true };
+const EXECUTE = { readOnlyHint: false, openWorldHint: true, destructiveHint: true };
 
 const deviceProp = {
   deviceId: { type: 'string', minLength: 1, maxLength: 128, description: 'Target enrolled device ID.' },
 };
 
 const TOOLS = [
-  tool('whoami', 'Return the authenticated GodControl account profile.', 'profile:read',
-    { type: 'object', properties: {}, additionalProperties: false }, RO),
+  tool('whoami', 'Return the profile represented by the current authenticated GodControl connection.', 'profile:read',
+    { type: 'object', properties: {}, additionalProperties: false }, RO, {
+      outputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', minLength: 1, pattern: '\\S', description: 'Stable opaque profile identifier.' },
+          name: { type: 'string', description: 'Display name for the authenticated profile.' },
+          email: { type: 'string', description: 'Email address for display only.' },
+          nickname: { type: 'string', description: 'Optional account label.' },
+        },
+        required: ['id'],
+        additionalProperties: false,
+      },
+      _meta: { securitySchemes: oauth(['profile:read']), 'openai/profile': true },
+    }),
   tool('devices_list', 'List devices enrolled to the authenticated GodControl account.', 'devices:read',
     { type: 'object', properties: {}, additionalProperties: false }, RO),
   tool('device_ping', 'Check whether one enrolled device is reachable.', 'devices:read',
@@ -44,7 +60,7 @@ const TOOLS = [
   tool('git_diff', 'Read the git diff for a repository inside an agent-approved root.', 'git:read',
     { type: 'object', properties: { ...deviceProp, repoPath: { type: 'string' }, staged: { type: 'boolean', default: false } }, required: ['deviceId', 'repoPath'], additionalProperties: false }, RO),
   tool('process_start', 'Start a process only when its executable and cwd are allowed by the device policy.', 'process:run',
-    { type: 'object', properties: { ...deviceProp, command: { type: 'string', minLength: 1, maxLength: 5000 }, cwd: { type: 'string' } }, required: ['deviceId', 'command'], additionalProperties: false }, WRITE),
+    { type: 'object', properties: { ...deviceProp, command: { type: 'string', minLength: 1, maxLength: 5000 }, cwd: { type: 'string' } }, required: ['deviceId', 'command'], additionalProperties: false }, EXECUTE),
   tool('process_read', 'Read bounded output from a previously started process session.', 'process:run',
     { type: 'object', properties: { ...deviceProp, session_id: { type: 'string' }, wait_ms: { type: 'integer', minimum: 0, maximum: 5000, default: 0 }, offset: { type: 'integer', minimum: 0 }, length: { type: 'integer', minimum: 1, maximum: 1000000, default: 100000 }, tail: { type: 'boolean', default: true } }, required: ['deviceId', 'session_id'], additionalProperties: false }, RO),
   tool('file_write', 'Create or update a text file inside an agent-approved writable root.', 'files:write',
