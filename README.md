@@ -119,3 +119,8 @@ npm test
 ```
 
 مستندات اصلی در `godcontrol/docs/` و فایل‌های آماده ارسال Plugin در `godcontrol/submission/` هستند.
+
+
+### GodControl OAuth
+
+The public plugin stack also includes a Redis-backed OAuth 2.1/OIDC authorization service under `godcontrol/auth/`. It is intended for the public MCP deployment and is separate from the private OpenAI Secure MCP Tunnel used for local development.

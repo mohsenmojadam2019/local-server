@@ -1,0 +1,28 @@
+[Unit]
+Description=GodControl OAuth 2.1 / OIDC Authorization Server
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=godcontrol
+Group=godcontrol
+WorkingDirectory=/opt/godcontrol-public/source/godcontrol
+EnvironmentFile=/etc/godcontrol/auth.env
+ExecStart=/usr/bin/node auth/server.mjs
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

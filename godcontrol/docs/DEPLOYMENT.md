@@ -19,3 +19,20 @@ When OpenAI provides the domain-verification token, set `OPENAI_APPS_CHALLENGE`.
 ## Reverse-proxy hardening
 
 Keep the hub bound to loopback and let the TLS reverse proxy own the public socket. Reject direct probes for dotfiles such as `.env` and `.git`, preserve `/.well-known/` for OAuth/domain verification, disable proxy buffering on MCP/WebSocket routes, and keep WebSocket read timeouts long enough for idle enrolled devices.
+
+
+## OAuth authorization server
+
+For a public plugin, deploy the included standards-based authorization service on a separate HTTPS origin such as `https://auth.example.com`.
+
+The service uses `oidc-provider` with Authorization Code + mandatory PKCE S256, Dynamic Client Registration, refresh-token rotation, RFC 8707 resource indicators, JWT access tokens, and persistent Redis-backed OAuth state. The hub validates those JWTs independently using the authorization server's JWKS.
+
+Production requires:
+- a dedicated Redis instance reachable only from localhost/private networking;
+- persistent Redis storage;
+- a durable private JWKS file;
+- at least two cookie signing keys;
+- a form-signing secret;
+- TLS on the authorization hostname.
+
+Configure the MCP hub with the same `OIDC_ISSUER`, the authorization server's `jwks_uri`, and `OIDC_AUDIENCE` equal to the MCP resource URL. Never expose Redis publicly.

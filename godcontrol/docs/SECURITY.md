@@ -48,3 +48,10 @@ The hub audit stream records correlation metadata such as user ID, device ID, to
 ## Process environment
 
 The process tool uses `spawn(..., { shell: false })` and does not inherit the agent's full environment. By default only basic non-secret variables such as PATH, HOME, LANG, TERM, USER and TMPDIR are passed. Additional variables require an explicit `GODCONTROL_PROCESS_ENV_ALLOWLIST`; never allowlist GodControl/OAuth/device credential variables.
+
+
+## Authorization server
+
+The public authorization server uses Authorization Code with mandatory PKCE, DCR, short-lived JWT access tokens, rotating refresh tokens, persistent Redis state, signed secure cookies, and an explicit MCP resource audience. Passwords are stored with randomized scrypt hashes; plaintext passwords are never persisted. Login and registration attempts are rate-limited in Redis.
+
+The authorization service and MCP resource server are separate trust boundaries. The MCP hub still validates issuer, audience, expiry, signature, and requested tool scope on every protected tool call.
