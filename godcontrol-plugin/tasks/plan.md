@@ -40,7 +40,7 @@ Build an isolated Node 22+ public MCP/OAuth hub and outbound-only local agent co
 
 ### Checkpoint: Complete
 - [x] Plugin install, test, check/build/lint, audit, smoke, and root test/check pass.
-- [ ] Changes committed and pushed to `origin/godcontrol-public-plugin` without merging main.
+- [x] Changes committed and pushed to `origin/godcontrol-public-plugin` without merging main.
 
 ## Risks and Mitigations
 

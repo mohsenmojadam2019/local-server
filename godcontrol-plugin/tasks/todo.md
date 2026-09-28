@@ -7,4 +7,4 @@
 - [x] Enrollment and outbound agent
 - [x] Tests and operational packaging
 - [x] Documentation and submission package
-- [ ] Root integration, report, verification, commit, and push
+- [x] Root integration, report, verification, commit, and push
