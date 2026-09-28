@@ -89,3 +89,33 @@ Presetهای داخل برنامه `Cache-Control` را روی پاسخ پروژ
 برای Web Game با WebSocket زیرساخت فعلی قابل استفاده است. برای Game Serverهای UDP/TCP خام باید Game Gateway جداگانه طراحی شود؛ این قسمت در نسخه فعلی عمداً وارد نشده تا هسته Hosting پایدار بماند.
 
 جزئیات بیشتر: `docs/ARCHITECTURE.md`
+
+
+## GodControl Remote MCP
+
+این ریپو اکنون یک زیرسیستم مستقل `godcontrol/` برای اتصال امن ChatGPT/Codex به دستگاه‌های ثبت‌شده دارد.
+
+معماری:
+
+```text
+ChatGPT / Codex
+  ↓ HTTPS + OAuth 2.1
+GodControl Hub
+  ↓ outbound WebSocket
+GodControl Agent
+  ↓ loopback MCP
+127.0.0.1:8787/mcp
+```
+
+پورت MCP لوکال مستقیماً روی اینترنت باز نمی‌شود. Agent فقط از داخل دستگاه به Hub وصل می‌شود و قبل از هر عملیات، محدودیت مسیرها و فرمان‌های مجاز را اعمال می‌کند.
+
+دستورات توسعه:
+
+```bash
+cd godcontrol
+npm install
+npm run check
+npm test
+```
+
+مستندات اصلی در `godcontrol/docs/` و فایل‌های آماده ارسال Plugin در `godcontrol/submission/` هستند.
