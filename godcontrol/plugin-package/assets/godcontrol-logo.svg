@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="GodControl logo">
+  <rect width="512" height="512" rx="112" fill="#172033"/>
+  <path d="M256 92c-74 0-134 60-134 134v60c0 74 60 134 134 134s134-60 134-134v-60c0-74-60-134-134-134Zm0 52c45 0 82 37 82 82v60c0 45-37 82-82 82s-82-37-82-82v-60c0-45 37-82 82-82Z" fill="#fff"/>
+  <path d="M256 190a36 36 0 1 1 0 72 36 36 0 0 1 0-72Zm-20 82h40v82h-40z" fill="#fff"/>
+</svg>
