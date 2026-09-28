@@ -11,7 +11,7 @@ const { LOCAL_MAPPING } = require('../shared/tools');
 const HUB = process.env.GODCONTROL_HUB_WS || 'ws://127.0.0.1:8790/agent';
 const DEVICE_TOKEN = process.env.GODCONTROL_DEVICE_TOKEN;
 const LOCAL_URL = process.env.GODCONTROL_LOCAL_MCP || 'http://127.0.0.1:8787/mcp';
-const LOCAL_TOKEN = process.env.GODCONTROL_LOCAL_TOKEN;
+const LOCAL_TOKEN = process.env.GODCONTROL_LOCAL_TOKEN || process.env.GODCONTROL_TOKEN;
 const DEVICE_ID = process.env.GODCONTROL_DEVICE_ID || os.hostname().replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 128);
 const DEVICE_NAME = (process.env.GODCONTROL_DEVICE_NAME || os.hostname()).slice(0, 120);
 
