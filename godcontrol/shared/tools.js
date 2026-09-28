@@ -16,10 +16,11 @@ function tool(name, description, scope, inputSchema, annotations, extra = {}) {
   };
 }
 
-const RO = { readOnlyHint: true, openWorldHint: false, destructiveHint: false };
+const RO = { readOnlyHint: true, openWorldHint: false, destructiveHint: false, idempotentHint: true };
 const WRITE = { readOnlyHint: false, openWorldHint: false, destructiveHint: false };
 const DESTRUCTIVE = { readOnlyHint: false, openWorldHint: false, destructiveHint: true };
-const EXECUTE = { readOnlyHint: false, openWorldHint: true, destructiveHint: true };
+const IDEMPOTENT_DESTRUCTIVE = { readOnlyHint: false, openWorldHint: false, destructiveHint: true, idempotentHint: true };
+const EXECUTE = { readOnlyHint: false, openWorldHint: true, destructiveHint: true, idempotentHint: false };
 
 const deviceProp = {
   deviceId: { type: 'string', minLength: 1, maxLength: 128, description: 'Target enrolled device ID.' },
@@ -63,8 +64,8 @@ const TOOLS = [
     { type: 'object', properties: { ...deviceProp, program: { type: 'string', minLength: 1, maxLength: 128, description: 'Executable name explicitly allowed by the device policy.' }, args: { type: 'array', items: { type: 'string', maxLength: 1000 }, maxItems: 100, default: [] }, cwd: { type: 'string' } }, required: ['deviceId', 'program'], additionalProperties: false }, EXECUTE),
   tool('process_read', 'Read bounded output from a previously started process session.', 'process:run',
     { type: 'object', properties: { ...deviceProp, session_id: { type: 'string' }, wait_ms: { type: 'integer', minimum: 0, maximum: 5000, default: 0 }, offset: { type: 'integer', minimum: 0 }, length: { type: 'integer', minimum: 1, maximum: 1000000, default: 100000 }, tail: { type: 'boolean', default: true } }, required: ['deviceId', 'session_id'], additionalProperties: false }, RO),
-  tool('file_write', 'Create, append to, or overwrite a text file inside an agent-approved writable root.', 'files:write',
-    { type: 'object', properties: { ...deviceProp, path: { type: 'string' }, content: { type: 'string', maxLength: 1000000 }, mode: { type: 'string', enum: ['rewrite', 'append'], default: 'rewrite' } }, required: ['deviceId', 'path', 'content'], additionalProperties: false }, DESTRUCTIVE),
+  tool('file_write', 'Create or fully replace a text file inside an agent-approved writable root.', 'files:write',
+    { type: 'object', properties: { ...deviceProp, path: { type: 'string' }, content: { type: 'string', maxLength: 1000000 } }, required: ['deviceId', 'path', 'content'], additionalProperties: false }, IDEMPOTENT_DESTRUCTIVE),
   tool('file_edit', 'Replace one exact text block in a file inside an agent-approved writable root.', 'files:write',
     { type: 'object', properties: { ...deviceProp, path: { type: 'string' }, old_text: { type: 'string', minLength: 1 }, new_text: { type: 'string' } }, required: ['deviceId', 'path', 'old_text', 'new_text'], additionalProperties: false }, WRITE),
   tool('file_remove', 'Remove one path inside an agent-approved writable root.', 'files:write',
