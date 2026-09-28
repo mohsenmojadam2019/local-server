@@ -10,12 +10,16 @@
   "scripts": {
     "hub": "node hub/server.js",
     "agent": "node agent/index.js",
-    "check": "node --check hub/server.js && node --check hub/auth.js && node --check hub/device-registry.js && node --check agent/index.js && node --check agent/policy.js && node --check agent/process-manager.js && node --check agent/local-mcp.js && node --check shared/tools.js",
-    "test": "node --test test/*.test.js"
+    "check": "node --check hub/server.js && node --check hub/auth.js && node --check hub/device-registry.js && node --check agent/index.js && node --check agent/policy.js && node --check agent/process-manager.js && node --check agent/local-mcp.js && node --check shared/tools.js && node --check auth/server.mjs && node --check auth/provider.mjs && node --check auth/account-store.mjs && node --check auth/redis-adapter.mjs",
+    "test": "node --test test/*.test.js",
+    "auth": "node auth/server.mjs",
+    "auth:create-account": "node auth/create-account.mjs"
   },
   "dependencies": {
     "express": "^4.21.2",
     "jose": "^6.1.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "oidc-provider": "^9.11.2",
+    "redis": "^6.2.1"
   }
 }
