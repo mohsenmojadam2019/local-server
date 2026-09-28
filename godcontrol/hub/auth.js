@@ -27,7 +27,10 @@ async function authenticate(req) {
   if (process.env.GODCONTROL_DEV_AUTH === 'true') {
     if (process.env.NODE_ENV === 'production') throw new Error('GODCONTROL_DEV_AUTH cannot run in production');
     if (!token.startsWith('dev:')) throw new AuthError('Invalid development token');
-    const [, sub = 'dev-user', scopes = ''] = token.split(':', 3);
+    const separator = token.indexOf(':', 4);
+    if (separator < 0) throw new AuthError('Malformed development token');
+    const sub = token.slice(4, separator) || 'dev-user';
+    const scopes = token.slice(separator + 1);
     return { sub, email: process.env.GODCONTROL_DEV_EMAIL || 'developer@example.invalid', email_verified: true, scopes: scopeSet(scopes.replace(/,/g, ' ')) };
   }
 
