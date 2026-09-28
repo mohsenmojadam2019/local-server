@@ -4,10 +4,19 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 class SafeProcessManager {
-  constructor({ maxOutputBytes = 1_000_000, timeoutMs = 120_000 } = {}) {
+  constructor({ maxOutputBytes = 1_000_000, timeoutMs = 120_000, envAllowlist } = {}) {
     this.maxOutputBytes = maxOutputBytes;
     this.timeoutMs = timeoutMs;
+    this.envAllowlist = envAllowlist || ['PATH', 'HOME', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TERM', 'USER', 'TMPDIR'];
     this.sessions = new Map();
+  }
+
+  childEnv() {
+    const env = {};
+    for (const key of this.envAllowlist) {
+      if (process.env[key] !== undefined) env[key] = process.env[key];
+    }
+    return env;
   }
 
   start({ program, args = [], cwd, policy }) {
@@ -17,7 +26,7 @@ class SafeProcessManager {
       cwd,
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
+      env: this.childEnv(),
     });
 
     const session = {
