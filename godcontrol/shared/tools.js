@@ -2,10 +2,29 @@
 
 const oauth = (scopes) => [{ type: 'oauth2', scopes }];
 
+const TITLES = {
+  whoami: 'Current profile',
+  devices_list: 'List devices',
+  device_ping: 'Ping device',
+  system_info: 'System information',
+  list_directory: 'List directory',
+  get_file_info: 'File information',
+  fs_read: 'Read file',
+  search: 'Search files',
+  git_status: 'Git status',
+  git_diff: 'Git diff',
+  process_start: 'Start approved process',
+  process_read: 'Read process output',
+  file_write: 'Write file',
+  file_edit: 'Edit file',
+  file_remove: 'Remove file',
+};
+
 function tool(name, description, scope, inputSchema, annotations, extra = {}) {
   const securitySchemes = oauth([scope]);
   return {
     name,
+    title: TITLES[name] || name,
     description,
     inputSchema,
     outputSchema: { type: 'object', additionalProperties: true },
