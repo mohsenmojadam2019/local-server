@@ -1,15 +1,19 @@
 'use strict';
 
+const os = require('os');
 const { WebSocket } = require('ws');
 const { Policy } = require('./policy');
 const { LocalMcpClient } = require('./local-mcp');
 const { SafeProcessManager } = require('./process-manager');
+const { getBearerToken } = require('./oauth');
 const { LOCAL_MAPPING } = require('../shared/tools');
 
 const HUB = process.env.GODCONTROL_HUB_WS || 'ws://127.0.0.1:8790/agent';
 const DEVICE_TOKEN = process.env.GODCONTROL_DEVICE_TOKEN;
 const LOCAL_URL = process.env.GODCONTROL_LOCAL_MCP || 'http://127.0.0.1:8787/mcp';
 const LOCAL_TOKEN = process.env.GODCONTROL_LOCAL_TOKEN;
+const DEVICE_ID = process.env.GODCONTROL_DEVICE_ID || os.hostname().replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 128);
+const DEVICE_NAME = (process.env.GODCONTROL_DEVICE_NAME || os.hostname()).slice(0, 120);
 
 const policy = new Policy();
 const local = new LocalMcpClient({ url: LOCAL_URL, token: LOCAL_TOKEN });
@@ -81,10 +85,36 @@ async function execute(tool, args) {
   return local.call(mapped.localTool, mapped.args);
 }
 
-function connect() {
-  if (!DEVICE_TOKEN) throw new Error('GODCONTROL_DEVICE_TOKEN is required');
+function scheduleReconnect() {
+  const delay = Math.min(backoff, 30000);
+  backoff = Math.min(backoff * 2, 30000);
+  setTimeout(() => { void connect(); }, delay).unref();
+}
+
+async function resolveAuthorization() {
+  if (DEVICE_TOKEN) return { value: 'Device ' + DEVICE_TOKEN, oauth: false };
+  const bearer = await getBearerToken();
+  return { value: 'Bearer ' + bearer, oauth: true };
+}
+
+async function connect() {
   if (!LOCAL_TOKEN) throw new Error('GODCONTROL_LOCAL_TOKEN is required');
-  const ws = new WebSocket(HUB, { headers: { Authorization: 'Device ' + DEVICE_TOKEN } });
+
+  let auth;
+  try {
+    auth = await resolveAuthorization();
+  } catch (error) {
+    console.error('GodControl agent authorization unavailable:', error.message);
+    scheduleReconnect();
+    return;
+  }
+
+  const hubUrl = new URL(HUB);
+  if (auth.oauth) {
+    hubUrl.searchParams.set('device_id', DEVICE_ID);
+    hubUrl.searchParams.set('name', DEVICE_NAME);
+  }
+  const ws = new WebSocket(hubUrl.toString(), { headers: { Authorization: auth.value } });
 
   ws.on('open', () => {
     backoff = 1000;
@@ -114,15 +144,10 @@ function connect() {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(reply));
   });
 
-  const reconnect = () => {
-    const delay = Math.min(backoff, 30000);
-    backoff = Math.min(backoff * 2, 30000);
-    setTimeout(connect, delay).unref();
-  };
-  ws.on('close', reconnect);
+  ws.on('close', scheduleReconnect);
   ws.on('error', () => { try { ws.close(); } catch {} });
 }
 
-if (require.main === module) connect();
+if (require.main === module) void connect();
 
-module.exports = { sanitizeArgs, mapCall, execute, connect };
+module.exports = { sanitizeArgs, mapCall, execute, connect, resolveAuthorization };

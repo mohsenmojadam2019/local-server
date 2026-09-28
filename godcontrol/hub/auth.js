@@ -58,7 +58,7 @@ function requireScopes(identity, required) {
 
 function resourceMetadata(origin) {
   const authz = process.env.OIDC_ISSUER;
-  const scopes = ['profile:read','devices:read','files:read','files:write','git:read','process:run','system:read','openid','email'];
+  const scopes = ['profile:read','devices:read','devices:connect','files:read','files:write','git:read','process:run','system:read','openid','email'];
   return {
     resource: origin,
     authorization_servers: authz ? [authz] : [],

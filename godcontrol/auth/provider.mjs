@@ -4,6 +4,7 @@ import RedisAdapter, { configureRedisAdapter } from './redis-adapter.mjs';
 export const RESOURCE_SCOPES = [
   'profile:read',
   'devices:read',
+  'devices:connect',
   'files:read',
   'files:write',
   'git:read',
