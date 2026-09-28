@@ -4,11 +4,13 @@
   "private": true,
   "description": "Remote MCP hub and outbound-only device agent for GodControl",
   "type": "commonjs",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "hub": "node hub/server.js",
     "agent": "node agent/index.js",
-    "check": "node --check hub/server.js && node --check hub/auth.js && node --check hub/device-registry.js && node --check agent/index.js && node --check agent/policy.js && node --check agent/local-mcp.js && node --check shared/tools.js",
+    "check": "node --check hub/server.js && node --check hub/auth.js && node --check hub/device-registry.js && node --check agent/index.js && node --check agent/policy.js && node --check agent/process-manager.js && node --check agent/local-mcp.js && node --check shared/tools.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
