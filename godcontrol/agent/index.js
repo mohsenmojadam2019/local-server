@@ -16,9 +16,14 @@ if (!LOCAL_TOKEN) throw new Error('GODCONTROL_LOCAL_TOKEN is required');
 
 const policy = new Policy();
 const local = new LocalMcpClient({ url: LOCAL_URL, token: LOCAL_TOKEN });
+const processEnvAllowlist = String(process.env.GODCONTROL_PROCESS_ENV_ALLOWLIST || '')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
 const processes = new SafeProcessManager({
   maxOutputBytes: policy.maxOutputBytes,
   timeoutMs: Number(process.env.GODCONTROL_PROCESS_TIMEOUT_MS || 120000),
+  envAllowlist: processEnvAllowlist.length ? processEnvAllowlist : undefined,
 });
 const completed = new Map();
 let backoff = 1000;
