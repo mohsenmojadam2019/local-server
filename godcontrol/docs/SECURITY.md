@@ -44,3 +44,7 @@ The hub audit stream records correlation metadata such as user ID, device ID, to
 - Rotate signing and OAuth credentials.
 - Keep `GODCONTROL_DEV_AUTH` disabled. The hub refuses development auth when `NODE_ENV=production`.
 - Keep local port 8787 bound to loopback.
+
+## Process environment
+
+The process tool uses `spawn(..., { shell: false })` and does not inherit the agent's full environment. By default only basic non-secret variables such as PATH, HOME, LANG, TERM, USER and TMPDIR are passed. Additional variables require an explicit `GODCONTROL_PROCESS_ENV_ALLOWLIST`; never allowlist GodControl/OAuth/device credential variables.
