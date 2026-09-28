@@ -1,0 +1,16 @@
+[Unit]
+Description=GodControl Device Agent
+After=network-online.target godcontrol-mcp.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/local-server/godcontrol
+EnvironmentFile=%h/.config/godcontrol/agent.env
+ExecStart=/usr/bin/node agent/index.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
