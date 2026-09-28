@@ -8,15 +8,15 @@
 
 **Category:** Developer tools
 
-**MCP URL:** `https://mcp.<publisher-domain>/mcp`
+**MCP URL:** `https://mcp.redcoweb.ir/mcp`
 
-**Website:** `https://mcp.<publisher-domain>/`
+**Website:** `https://mcp.redcoweb.ir/`
 
-**Support:** `https://mcp.<publisher-domain>/support`
+**Support:** `https://mcp.redcoweb.ir/support`
 
-**Privacy:** `https://mcp.<publisher-domain>/privacy`
+**Privacy:** `https://mcp.redcoweb.ir/privacy`
 
-**Terms:** `https://mcp.<publisher-domain>/terms`
+**Terms:** `https://mcp.redcoweb.ir/terms`
 
 **Authentication:** OAuth 2.1 / OIDC with PKCE-compatible provider.
 

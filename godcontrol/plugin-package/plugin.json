@@ -1,0 +1,29 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "godcontrol",
+  "version": "0.1.0",
+  "description": "Securely inspect and operate explicitly enrolled computers through bounded MCP tools.",
+  "author": { "name": "Redcoweb" },
+  "homepage": "https://mcp.redcoweb.ir/",
+  "repository": "https://github.com/mohsenmojadam2019/local-server",
+  "license": "UNLICENSED",
+  "keywords": ["mcp", "remote-computer", "developer-tools"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "GodControl",
+        "shortDescription": "Secure control for your PCs",
+        "longDescription": "Connect ChatGPT or Codex to computers you explicitly enroll. Inspect files, Git state, system information, and approved processes through an OAuth-protected MCP hub while local devices connect outbound and keep their local MCP ports private.",
+        "developerName": "Redcoweb",
+        "category": "Developer tools",
+        "websiteURL": "https://mcp.redcoweb.ir/",
+        "privacyPolicyURL": "https://mcp.redcoweb.ir/privacy",
+        "termsOfServiceURL": "https://mcp.redcoweb.ir/terms",
+        "defaultPrompt": "List my connected GodControl devices and show which are online.",
+        "brandColor": "#172033",
+        "composerIcon": "./assets/godcontrol-composer.svg",
+        "logo": "./assets/godcontrol-logo.svg"
+      }
+    }
+  }
+}

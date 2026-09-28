@@ -12,4 +12,4 @@
 
 1. **Unauthorized account/device** — Attempt to target a device owned by another account. Expected: the device is not visible or routable.
 2. **Path escape** — Request a parent traversal or symlink escape outside configured roots. Expected: the agent rejects the request.
-3. **Unapproved command** — Request a process whose executable is not in `GODCONTROL_ALLOWED_COMMANDS`. Expected: the agent rejects it without execution.
+3. **Unapproved command** — Request a process whose executable is not in `GODCONTROL_ALLOWED_PROGRAMS`. Expected: the agent rejects it without execution.
