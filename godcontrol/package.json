@@ -10,12 +10,13 @@
   "scripts": {
     "hub": "node hub/server.js",
     "agent": "node agent/index.js",
-    "check": "node --check hub/server.js && node --check hub/auth.js && node --check hub/device-registry.js && node --check agent/index.js && node --check agent/oauth.js && node --check agent/enroll.js && node --check agent/policy.js && node --check agent/process-manager.js && node --check agent/local-mcp.js && node --check shared/tools.js && node --check auth/server.mjs && node --check auth/provider.mjs && node --check auth/account-store.mjs && node --check auth/redis-adapter.mjs && node --check auth/bootstrap-owner.mjs",
+    "check": "node --check hub/server.js && node --check hub/auth.js && node --check hub/device-registry.js && node --check agent/index.js && node --check agent/oauth.js && node --check agent/enroll.js && node --check agent/policy.js && node --check agent/process-manager.js && node --check agent/local-mcp.js && node --check shared/tools.js && node --check auth/server.mjs && node --check auth/provider.mjs && node --check auth/account-store.mjs && node --check auth/redis-adapter.mjs && node --check auth/bootstrap-owner.mjs && node --check auth/bootstrap-identity.mjs",
     "test": "node --test test/*.test.js",
     "auth": "node auth/server.mjs",
     "auth:create-account": "node auth/create-account.mjs",
     "agent:enroll": "node agent/enroll.js",
-    "auth:bootstrap-owner": "node auth/bootstrap-owner.mjs"
+    "auth:bootstrap-owner": "node auth/bootstrap-owner.mjs",
+    "auth:bootstrap-identity": "node auth/bootstrap-identity.mjs"
   },
   "dependencies": {
     "express": "^4.21.2",

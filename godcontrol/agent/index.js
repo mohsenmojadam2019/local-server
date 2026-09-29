@@ -14,6 +14,7 @@ const LOCAL_URL = process.env.GODCONTROL_LOCAL_MCP || 'http://127.0.0.1:8787/mcp
 const LOCAL_TOKEN = process.env.GODCONTROL_LOCAL_TOKEN || process.env.GODCONTROL_TOKEN;
 const DEVICE_ID = process.env.GODCONTROL_DEVICE_ID || os.hostname().replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 128);
 const DEVICE_NAME = (process.env.GODCONTROL_DEVICE_NAME || os.hostname()).slice(0, 120);
+const TRUSTED_TUNNEL = process.env.GODCONTROL_TRUSTED_TUNNEL === 'true';
 
 const policy = new Policy();
 const local = new LocalMcpClient({ url: LOCAL_URL, token: LOCAL_TOKEN });
@@ -92,9 +93,17 @@ function scheduleReconnect() {
 }
 
 async function resolveAuthorization() {
-  if (DEVICE_TOKEN) return { value: 'Device ' + DEVICE_TOKEN, oauth: false };
+  if (TRUSTED_TUNNEL) {
+    const url = new URL(HUB);
+    const loopback = new Set(['127.0.0.1', 'localhost', '::1']);
+    if (url.protocol !== 'ws:' || !loopback.has(url.hostname)) {
+      throw new Error('Trusted tunnel mode requires a loopback ws:// hub URL');
+    }
+    return { value: null, oauth: false, trustedTunnel: true };
+  }
+  if (DEVICE_TOKEN) return { value: 'Device ' + DEVICE_TOKEN, oauth: false, trustedTunnel: false };
   const bearer = await getBearerToken();
-  return { value: 'Bearer ' + bearer, oauth: true };
+  return { value: 'Bearer ' + bearer, oauth: true, trustedTunnel: false };
 }
 
 async function connect() {
@@ -110,11 +119,12 @@ async function connect() {
   }
 
   const hubUrl = new URL(HUB);
-  if (auth.oauth) {
+  if (auth.oauth || auth.trustedTunnel) {
     hubUrl.searchParams.set('device_id', DEVICE_ID);
     hubUrl.searchParams.set('name', DEVICE_NAME);
   }
-  const ws = new WebSocket(hubUrl.toString(), { headers: { Authorization: auth.value } });
+  const headers = auth.value ? { Authorization: auth.value } : {};
+  const ws = new WebSocket(hubUrl.toString(), { headers });
 
   ws.on('open', () => {
     backoff = 1000;
