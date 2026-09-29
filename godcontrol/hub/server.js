@@ -15,6 +15,8 @@ const PORT = Number(process.env.PORT || 8790);
 const HOST = process.env.HOST || '127.0.0.1';
 const PUBLIC_ORIGIN = (process.env.PUBLIC_ORIGIN || 'http://127.0.0.1:' + PORT).replace(/\/$/, '');
 const auditFile = process.env.GODCONTROL_AUDIT_FILE;
+const INTERNAL_AGENT_PORT = Number(process.env.GODCONTROL_INTERNAL_AGENT_PORT || 0);
+const INTERNAL_AGENT_USER_FILE = process.env.GODCONTROL_INTERNAL_AGENT_USER_FILE || '';
 
 function audit(event) {
   const line = JSON.stringify({ ts: new Date().toISOString(), ...event });
@@ -154,6 +156,18 @@ app.post('/mcp', async (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
+function attachAgentSocket(ws, claims) {
+  ws.godcontrol = claims;
+  wss.emit('connection', ws);
+}
+
+function readInternalAgentUserId() {
+  if (!INTERNAL_AGENT_USER_FILE) throw new Error('GODCONTROL_INTERNAL_AGENT_USER_FILE is required');
+  const userId = fs.readFileSync(INTERNAL_AGENT_USER_FILE, 'utf8').trim();
+  if (!userId) throw new Error('Internal agent user id file is empty');
+  return userId;
+}
+
 function validateDeviceIdentity(deviceId, name) {
   const id = String(deviceId || '');
   if (!/^[A-Za-z0-9._-]{1,128}$/.test(id)) throw new Error('Invalid device id');
@@ -184,10 +198,27 @@ server.on('upgrade', async (req, socket, head) => {
     return socket.destroy();
   }
 
-  wss.handleUpgrade(req, socket, head, (ws) => {
-    ws.godcontrol = claims;
-    wss.emit('connection', ws, req);
-  });
+  wss.handleUpgrade(req, socket, head, (ws) => attachAgentSocket(ws, claims));
+});
+
+const internalAgentServer = http.createServer((_req, res) => {
+  res.statusCode = 404;
+  res.end('Not found');
+});
+
+internalAgentServer.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url, 'http://127.0.0.1');
+  if (url.pathname !== '/agent/internal') return socket.destroy();
+  try {
+    const device = validateDeviceIdentity(
+      url.searchParams.get('device_id'),
+      url.searchParams.get('name'),
+    );
+    const claims = { userId: readInternalAgentUserId(), ...device };
+    wss.handleUpgrade(req, socket, head, (ws) => attachAgentSocket(ws, claims));
+  } catch {
+    socket.destroy();
+  }
 });
 
 wss.on('connection', (ws) => {
@@ -210,6 +241,11 @@ heartbeat.unref();
 
 if (require.main === module) {
   server.listen(PORT, HOST, () => console.log('GodControl hub listening on ' + HOST + ':' + PORT));
+  if (INTERNAL_AGENT_PORT > 0) {
+    internalAgentServer.listen(INTERNAL_AGENT_PORT, '127.0.0.1', () => {
+      console.log('GodControl internal agent listener on 127.0.0.1:' + INTERNAL_AGENT_PORT);
+    });
+  }
 }
 
-module.exports = { app, server, registry };
+module.exports = { app, server, registry, internalAgentServer };
