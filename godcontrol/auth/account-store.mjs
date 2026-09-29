@@ -84,6 +84,11 @@ export class AccountStore {
     return id ? this.findById(id) : null;
   }
 
+  async count() {
+    const keys = await this.redis.keys(this.prefix + 'id:*');
+    return keys.length;
+  }
+
   async authenticate(email, password) {
     const account = await this.findByEmail(email);
     if (!account || account.disabled) return null;
