@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import path from 'node:path';
 import { createClient } from 'redis';
 import { AccountStore, normalizeEmail } from './account-store.mjs';
 
@@ -26,7 +27,7 @@ try {
     await redis.set(store.idKey(account.id), JSON.stringify(account));
   }
 
-  fs.mkdirSync(new URL('.', 'file://' + outputFile).pathname, { recursive: true });
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
   fs.writeFileSync(outputFile, account.id + '\n', { mode: 0o640 });
   console.log(JSON.stringify({ ok: true, email, account_id: account.id, id_file: outputFile }));
 } finally {
