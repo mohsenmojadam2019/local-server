@@ -124,3 +124,11 @@ npm test
 ### GodControl OAuth
 
 The public plugin stack also includes a Redis-backed OAuth 2.1/OIDC authorization service under `godcontrol/auth/`. It is intended for the public MCP deployment and is separate from the private OpenAI Secure MCP Tunnel used for local development.
+
+
+## AI / ChatGPT operational context
+
+For the current `god` workstation, GodControl service layout, tool-routing rules, persistent services, and non-secret runtime endpoints, read:
+
+- [GODCONTROL_CONTEXT.md](./GODCONTROL_CONTEXT.md)
+- [AGENTS.md](./AGENTS.md)
