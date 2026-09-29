@@ -167,7 +167,7 @@ app.post('/interaction/:uid/login', formBody, async (req, res, next) => {
 
     await redis.del('godcontrol:auth:limit:' + key);
     return provider.interactionFinished(req, res, {
-      login: { accountId: account.id, remember: true, amr: ['pwd'] },
+      login: { accountId: account.id },
     }, { mergeWithLastSubmission: false });
   } catch (error) {
     return next(error);
@@ -248,7 +248,13 @@ app.post('/register', formBody, async (req, res) => {
 
 app.use(provider.callback());
 app.use((error, _req, res, _next) => {
-  console.error('Authorization error:', error?.message || 'unknown');
+  console.error('Authorization error:', {
+    name: error?.name,
+    message: error?.message,
+    error: error?.error,
+    description: error?.error_description,
+    statusCode: error?.statusCode,
+  });
   if (res.headersSent) return;
   res.status(500).type('html').send(layout('Authorization error', '<h1>Authorization could not continue</h1><p>Please return to ChatGPT and try connecting again.</p>'));
 });
