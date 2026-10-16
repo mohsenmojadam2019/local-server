@@ -5,6 +5,8 @@ import express from 'express';
 import { createClient } from 'redis';
 import { buildProvider, RESOURCE_SCOPES } from './provider.mjs';
 import { AccountStore } from './account-store.mjs';
+import { saveConsentGrant } from './consent.mjs';
+import { authorizationErrorResponse } from './error-response.mjs';
 
 const ISSUER = String(process.env.OIDC_ISSUER || 'https://auth.redcoweb.ir').replace(/\/$/, '');
 const RESOURCE = String(process.env.GODCONTROL_MCP_RESOURCE || 'https://mcp.redcoweb.ir').replace(/\/$/, '');
@@ -180,21 +182,7 @@ app.post('/interaction/:uid/confirm', formBody, async (req, res, next) => {
     if (details.prompt.name !== 'consent') return res.status(400).send('Invalid interaction');
     if (!verifyToken(details.uid, req.body.csrf)) return res.status(400).send('Invalid form token');
 
-    const { prompt: { details: missing }, params, session } = details;
-    let grantId = details.grantId;
-    let grant = grantId ? await provider.Grant.find(grantId) : new provider.Grant({
-      accountId: session.accountId,
-      clientId: params.client_id,
-    });
-
-    if (missing.missingOIDCScope) grant.addOIDCScope(missing.missingOIDCScope.join(' '));
-    if (missing.missingOIDCClaims) grant.addOIDCClaims(missing.missingOIDCClaims);
-    if (missing.missingResourceScopes) {
-      for (const [indicator, scopes] of Object.entries(missing.missingResourceScopes)) {
-        grant.addResourceScope(indicator, scopes.join(' '));
-      }
-    }
-    grantId = await grant.save();
+    const grantId = await saveConsentGrant(provider, details);
 
     return provider.interactionFinished(req, res, {
       consent: details.grantId ? {} : { grantId },
@@ -256,7 +244,7 @@ app.use((error, _req, res, _next) => {
     statusCode: error?.statusCode,
   });
   if (res.headersSent) return;
-  res.status(500).type('html').send(layout('Authorization error', '<h1>Authorization could not continue</h1><p>Please return to ChatGPT and try connecting again.</p>'));
+  return authorizationErrorResponse(error, res, layout);
 });
 
 const server = http.createServer(app);
