@@ -63,6 +63,10 @@ app.get('/.well-known/openai-apps-challenge', (_req, res) => {
 });
 
 app.get('/.well-known/oauth-protected-resource', (_req, res) => res.json(resourceMetadata(PUBLIC_ORIGIN)));
+// MCP clients may resolve protected-resource metadata relative to a pathful
+// resource URL. Keep both standard path-aware forms equivalent.
+app.get('/.well-known/oauth-protected-resource/mcp', (_req, res) => res.json(resourceMetadata(PUBLIC_ORIGIN)));
+app.get('/mcp/.well-known/oauth-protected-resource', (_req, res) => res.json(resourceMetadata(PUBLIC_ORIGIN)));
 
 const sessions = new Map();
 
@@ -151,6 +155,20 @@ app.post('/mcp', async (req, res) => {
     console.error('MCP error:', error.message);
     return res.status(500).json(rpcError(id, -32603, 'Internal error'));
   }
+});
+
+// A browser GET must not fall through to Express's generic "Cannot GET /mcp".
+// Return the OAuth challenge so clients can discover the protected resource.
+app.get('/mcp', async (req, res) => {
+  try {
+    await authenticate(req);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(401).set('WWW-Authenticate', challenge(PUBLIC_ORIGIN)).json({ error: 'unauthorized' });
+    }
+    return res.status(500).json({ error: 'server_configuration_error' });
+  }
+  return res.status(405).set('Allow', 'POST, OPTIONS').json({ error: 'method_not_allowed' });
 });
 
 const server = http.createServer(app);

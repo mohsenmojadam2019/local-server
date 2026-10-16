@@ -97,4 +97,12 @@ test('hub routes authenticated MCP calls to an enrolled device', async (t) => {
   const robots = await fetch('http://127.0.0.1:' + port + '/robots.txt');
   assert.equal(robots.status, 200);
   assert.match(await robots.text(), /Disallow: \/$/m);
+
+  const metadata = await fetch('http://127.0.0.1:' + port + '/.well-known/oauth-protected-resource/mcp');
+  assert.equal(metadata.status, 200);
+  assert.deepEqual((await metadata.json()).authorization_servers, []);
+
+  const getMcp = await fetch('http://127.0.0.1:' + port + '/mcp');
+  assert.equal(getMcp.status, 401);
+  assert.match(getMcp.headers.get('www-authenticate') || '', /oauth-protected-resource/);
 });
