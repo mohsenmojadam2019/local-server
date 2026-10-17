@@ -13,13 +13,19 @@ function base64url(buffer) {
   return Buffer.from(buffer).toString('base64url');
 }
 
-function openBrowser(url) {
-  const platform = process.platform;
+function browserLaunch(platform, url) {
+  if (platform === 'darwin') return { command: 'open', args: [url] };
+  // Do not invoke cmd.exe: '&' in OAuth query strings is a command separator.
+  // rundll32 receives the URL as one argv item and preserves every parameter.
+  if (platform === 'win32') return { command: 'rundll32.exe', args: ['url.dll,FileProtocolHandler', url] };
+  return { command: 'xdg-open', args: [url] };
+}
+
+function openBrowser(url, platform = process.platform) {
   let child;
   try {
-    if (platform === 'darwin') child = spawn('open', [url], { detached: true, stdio: 'ignore' });
-    else if (platform === 'win32') child = spawn('cmd.exe', ['/c', 'start', '', url], { detached: true, stdio: 'ignore', windowsHide: true });
-    else child = spawn('xdg-open', [url], { detached: true, stdio: 'ignore' });
+    const launch = browserLaunch(platform, url);
+    child = spawn(launch.command, launch.args, { detached: true, stdio: 'ignore', windowsHide: platform === 'win32' });
     child.unref();
     return true;
   } catch {
@@ -167,7 +173,11 @@ async function main() {
   console.log('GodControl device enrollment complete.');
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { browserLaunch, openBrowser };
