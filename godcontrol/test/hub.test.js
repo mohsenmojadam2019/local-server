@@ -43,11 +43,16 @@ test('hub routes authenticated MCP calls to an enrolled device', async (t) => {
     const msg = JSON.parse(String(raw));
     if (msg.type !== 'call') return;
     ws.send(JSON.stringify({ type: 'ack', callId: msg.callId }));
+    // Simulate an ordinary agent refusal without weakening device policy.
+    const error = msg.tool === 'process_start' && msg.args.program === 'ls'
+      ? 'Program is not allowed by device policy'
+      : msg.tool === 'fs_read' && msg.args.maxBytes === 128
+        ? 'File exceeds maxBytes limit' : null;
     ws.send(JSON.stringify({
       type: 'result',
       callId: msg.callId,
-      ok: true,
-      result: { echoedTool: msg.tool, args: msg.args },
+      ok: !error,
+      ...(error ? { error } : { result: { echoedTool: msg.tool, args: msg.args } }),
     }));
   });
 
@@ -78,6 +83,23 @@ test('hub routes authenticated MCP calls to an enrolled device', async (t) => {
   const pingRes = await post({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'device_ping', arguments: { deviceId: 'device-1' } } });
   const pingJson = await pingRes.json();
   assert.equal(pingJson.result.structuredContent.echoedTool, 'device_ping');
+
+  const deniedExec = await post({ jsonrpc: '2.0', id: 30, method: 'tools/call', params: {
+    name: 'process_start', arguments: { deviceId: 'device-1', program: 'ls', cwd: '/allowed/project' },
+  } });
+  assert.equal(deniedExec.status, 400);
+  const deniedExecJson = await deniedExec.json();
+  assert.equal(deniedExecJson.error.code, -32013);
+  assert.match(deniedExecJson.error.message, /allowlist/i);
+  assert.doesNotMatch(deniedExecJson.error.message, /\/allowed\//);
+
+  const smallRead = await post({ jsonrpc: '2.0', id: 31, method: 'tools/call', params: {
+    name: 'fs_read', arguments: { deviceId: 'device-1', path: '/allowed/README.md', maxBytes: 128 },
+  } });
+  assert.equal(smallRead.status, 400);
+  const smallReadJson = await smallRead.json();
+  assert.equal(smallReadJson.error.code, -32014);
+  assert.match(smallReadJson.error.message, /get_file_info/);
 
   const unauthRes = await post({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'devices_list', arguments: {} } }, false);
   assert.equal(unauthRes.status, 401);

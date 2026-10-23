@@ -10,6 +10,7 @@ const { TOOLS, BY_NAME } = require('../shared/tools');
 const { AuthError, authenticate, requireScopes, resourceMetadata, challenge } = require('./auth');
 const { verifyDeviceToken } = require('./device-auth');
 const { DeviceRegistry } = require('./device-registry');
+const { classifyDeviceToolError } = require('./tool-errors');
 
 const PORT = Number(process.env.PORT || 8790);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -151,6 +152,13 @@ app.post('/mcp', async (req, res) => {
       const auth = challenge(PUBLIC_ORIGIN, error.scopes || []);
       res.setHeader('WWW-Authenticate', auth);
       return res.status(401).json(rpcError(id, -32001, error.message, { 'mcp/www_authenticate': auth }));
+    }
+    // Known device-policy failures are caller errors, not hub outages. Return
+    // only allowlisted, generic guidance; never expose raw agent error text,
+    // secrets or absolute paths through the public MCP endpoint.
+    const knownError = classifyDeviceToolError(error);
+    if (knownError) {
+      return res.status(knownError.status).json(rpcError(id, knownError.code, knownError.message));
     }
     console.error('MCP error:', error.message);
     return res.status(500).json(rpcError(id, -32603, 'Internal error'));
