@@ -33,7 +33,8 @@ function childEnvironment() {
   env.GODCONTROL_DEVICE_ID = settings.deviceId;
   env.GODCONTROL_DEVICE_NAME = env.GODCONTROL_DEVICE_NAME || settings.deviceName || settings.deviceId;
   env.GODCONTROL_HUB_WS = env.GODCONTROL_HUB_WS || settings.hubUrl || 'wss://mcp.redcoweb.ir/agent/connect';
-  env.GODCONTROL_LOCAL_MCP = env.GODCONTROL_LOCAL_MCP || settings.localMcp || 'http://127.0.0.1:8787/mcp';
+  env.GODCONTROL_LOCAL_MCP = env.GODCONTROL_LOCAL_MCP || settings.localMcp || 'http://127.0.0.1:18787/mcp';
+  if (process.platform === 'win32') env.GODCONTROL_LOCAL_PORT = new URL(env.GODCONTROL_LOCAL_MCP).port || '18787';
   env.GODCONTROL_READ_ROOTS = settings.readRoots.join(',');
   env.GODCONTROL_WRITE_ROOTS = settings.writeRoots.join(',');
   env.GODCONTROL_ALLOWED_PROGRAMS = settings.allowedPrograms.join(',');
