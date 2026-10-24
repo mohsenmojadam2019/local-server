@@ -51,8 +51,10 @@ async function main() {
       console.log('GodControl device already authorized; no browser login needed.');
       return;
     } catch (error) {
-      console.warn('Stored device authorization is no longer valid:', error.message);
-      console.warn('A new owner-approved pairing is required once; cannot bypass authorization.');
+      console.error('Saved authorization unavailable:', error.message);
+      console.error('No automatic browser login was started. Retry later or use --force to approve a new enrollment explicitly.');
+      process.exitCode = 1;
+      return;
     }
   }
   const metadata = await discover();
