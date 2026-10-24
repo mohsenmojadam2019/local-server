@@ -7,12 +7,12 @@ Once **legitimate initial enrollment and local MCP configuration** exist, the Go
 - Server-validated OAuth/device identity, a valid **local MCP bearer token**, a loopback-only MCP server and locally enforced path/executable allowlists are **all still required**.
 - Changing `enabled` to `false` stops the supervised agent within about three seconds. For permanent credential revocation, additionally revoke the enrolled device/authorization at the identity provider.
 - Nothing can connect to a powered-off device, bypass missing enrollment or install an agent on an unreachable workstation.
-- This repository provides a remote Agent. The actual **local MCP implementation is a separate prerequisite** (not Local Server Pro's dashboard on port 8788).
+- The Windows workstation now includes a **loopback-only local MCP** managed by the autoconnect launcher on port **18787** to avoid the Local Server Pro reverse proxy on **8787**. The existing Linux god local MCP remains separately managed on 8787.
 - Only the device owner should run the once-only installer.
 
 ## Windows `matin`
 
-Prerequisites: Node.js 22+, `npm ci` inside `local-server\godcontrol`, and the existing GodControl local MCP listening on `127.0.0.1:8787`. Perform `npm run agent:enroll` **once** and authorize it with the matching GodControl account. If enrollment is already done, do not repeat it.
+Prerequisites: Node.js 22+ and `npm ci` inside `local-server\godcontrol`. The installer automatically generates the local token and starts a private Windows local MCP on `127.0.0.1:18787`. Device identity still requires a **one-time owner-approved enrollment** (OAuth or pre-authorized SSH tunnel). Once OAuth is enrolled, the saved refresh credential reconnects silently and no repeat browser login is required.
 
 From `C:\Users\matin\local-server\godcontrol`, the once-only installer is:
 
@@ -20,7 +20,7 @@ From `C:\Users\matin\local-server\godcontrol`, the once-only installer is:
 powershell -NoProfile -File .\autoconnect\install-windows.ps1 -DeviceId matin-windows -ProjectRoot C:\xampp\htdocs\digizargar_front
 ```
 
-The installer prompts **once** for the locally issued MCP token and protects it using Windows **user-scoped DPAPI**. It writes a non-secret project-scoped policy and opt-in marker to `%LOCALAPPDATA%\GodControl`, then registers a **non-elevated per-user Windows Task Scheduler** logon task. It starts the task immediately if OAuth and the token are configured.
+The installer generates a cryptographically random local token **without any prompt**, protecting it using Windows **user-scoped DPAPI**. It writes a non-secret project-scoped policy and opt-in marker to `%LOCALAPPDATA%\GodControl`, then registers a **non-elevated per-user Windows Task Scheduler** logon task. It starts the task immediately if approved OAuth/SSH credentials exist; the supervised launcher also starts/restores the private Windows MCP server.
 
 The file that allows/revokes *automatic startup*, as requested, is:
 
@@ -73,5 +73,11 @@ bash ./autoconnect/install-god.sh --disable
 - `invalid_request: client_id missing`: legacy Windows `cmd.exe start` can truncate an OAuth URL containing `&`; use the complete authorized enrollment URL or a fixed browser launcher.
 - `consent_missing`: the local operator has not opted into persistent connection.
 - `enrollment: missing`: the device needs a **one-time** authorized OAuth enrollment or its existing trusted SSH tunnel.
-- `localMcpSecret: missing`: the local MCP token has not been configured; do not copy secrets into chat or Git.
+- `localMcpSecret: missing`: the local MCP token has not been configured; re-run the once-only installer (it generates a token automatically). Do not copy secrets into chat or Git.
 - Hub `/health` returning 200 proves only hub health; `devices_list` plus `device_ping` are needed to confirm a workstation is actually reachable.
+
+### Reconnection with no repeat browser login
+
+**Do not run `npm run agent:enroll` every time.** With an enrolled, approved device, Task Scheduler automatically starts the launcher, private local MCP and agent on Windows user logon. The agent uses the saved OAuth refresh token (rotated automatically) to authenticate and reconnect if the network drops. Existing authorization is also silently reused if `npm run agent:enroll` is accidentally rerun. If the refresh credential is revoked or expires, a fresh **one-time** approval is required; security is never bypassed.
+
+The **first enrollment cannot occur on an offline workstation from ChatGPT**: the owner must either already have a valid saved authorization or approve a one-time initial pairing. This change removes repeated prompts, not the security requirement for initial authorization.

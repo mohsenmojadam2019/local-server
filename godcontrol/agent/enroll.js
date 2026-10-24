@@ -1,10 +1,11 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
 const http = require('http');
 const os = require('os');
 const { spawn } = require('child_process');
-const { writeConfig } = require('./oauth');
+const { writeConfig, getBearerToken, defaultConfigPath } = require('./oauth');
 
 const ISSUER = (process.env.GODCONTROL_OAUTH_ISSUER || 'https://auth.redcoweb.ir').replace(/\/$/, '');
 const RESOURCE = (process.env.GODCONTROL_MCP_RESOURCE || 'https://mcp.redcoweb.ir').replace(/\/$/, '');
@@ -42,6 +43,20 @@ async function discover() {
 }
 
 async function main() {
+  // An already-enrolled workstation should NEVER open a browser again just to reconnect.
+  // Existing refresh credentials are used silently. --force explicitly re-enrolls.
+  if (!process.argv.includes('--force') && fs.existsSync(defaultConfigPath())) {
+    try {
+      await getBearerToken();
+      console.log('GodControl device already authorized; no browser login needed.');
+      return;
+    } catch (error) {
+      console.error('Saved authorization unavailable:', error.message);
+      console.error('No automatic browser login was started. Retry later or use --force to approve a new enrollment explicitly.');
+      process.exitCode = 1;
+      return;
+    }
+  }
   const metadata = await discover();
   let resolveCode;
   let rejectCode;
