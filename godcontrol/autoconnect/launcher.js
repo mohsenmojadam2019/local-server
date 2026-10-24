@@ -7,6 +7,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const net = require('node:net');
 const { spawn, spawnSync } = require('node:child_process');
 const { configPaths, readJson, consentStatus, validateSettings } = require('./config');
 const { defaultConfigPath } = require('../agent/oauth');
@@ -40,6 +41,42 @@ function childEnvironment() {
     env.GODCONTROL_LOCAL_TOKEN = readDpapiSecret();
   }
   return env;
+}
+
+let localMcpChild = null;
+let checkingLocalMcp = null;
+function portOpen(host, port) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host, port });
+    socket.setTimeout(750);
+    socket.once('connect', () => { socket.destroy(); resolve(true); });
+    socket.once('timeout', () => { socket.destroy(); resolve(false); });
+    socket.once('error', () => { socket.destroy(); resolve(false); });
+  });
+}
+async function ensureLocalMcp(env) {
+  // The Linux god workstation already runs a separately managed local MCP.
+  if (process.platform !== 'win32') return;
+  if (checkingLocalMcp) return checkingLocalMcp;
+  checkingLocalMcp = (async () => {
+    const url = new URL(env.GODCONTROL_LOCAL_MCP);
+    const port = Number(url.port || 80);
+    const host = url.hostname.replace(/^\[|\]$/g, '');
+    if (await portOpen(host, port)) return;
+    if (!localMcpChild) {
+      localMcpChild = spawn(process.execPath, [path.join(__dirname, '..', 'local-mcp', 'server.js')], {
+        cwd: path.join(__dirname, '..'), env, stdio:'inherit', windowsHide:true,
+      });
+      localMcpChild.on('error', error => console.error('Local MCP start failed:', error.message));
+      localMcpChild.on('exit', () => { localMcpChild = null; });
+    }
+    for (let attempt=0;attempt<16;attempt++) {
+      if (await portOpen(host, port)) return;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    throw new Error('Local MCP did not open its loopback port');
+  })();
+  try { return await checkingLocalMcp; } finally { checkingLocalMcp = null; }
 }
 
 function status() {
@@ -76,9 +113,10 @@ if (process.argv.includes('--check')) {
       shuttingDown = true;
       if (retry) clearTimeout(retry);
       if (child) child.kill();
+      if (localMcpChild) localMcpChild.kill();
       clearInterval(watch);
     };
-    const launch = () => {
+    const launch = async () => {
       if (shuttingDown) return;
       if (!consent().ok) { console.warn('Local operator disabled GodControl auto-connect'); stop(); return; }
       let env;
@@ -87,6 +125,14 @@ if (process.argv.includes('--check')) {
       if (!env.GODCONTROL_LOCAL_TOKEN && !env.GODCONTROL_TOKEN) {
         console.error('Local MCP token unavailable; agent not started'); process.exitCode = 2; stop(); return;
       }
+      try { await ensureLocalMcp(env); }
+      catch (error) {
+        console.error('Local MCP readiness failed:', error.message);
+        retry = setTimeout(launch, delay);
+        delay = Math.min(delay * 2, 30000);
+        return;
+      }
+      if (shuttingDown || !consent().ok) return;
       child = spawn(process.execPath, [path.join(__dirname, '..', 'agent', 'index.js')], {
         cwd: path.join(__dirname, '..'), stdio: 'inherit', env, windowsHide: true,
       });
@@ -98,7 +144,13 @@ if (process.argv.includes('--check')) {
         delay = Math.min(delay * 2, 30000);
       });
     };
-    const watch = setInterval(() => { if (!consent().ok) stop(); }, 3000);
+    const watch = setInterval(() => {
+      if (!consent().ok) { stop(); return; }
+      if (child && process.platform === 'win32') {
+        try { void ensureLocalMcp(childEnvironment()).catch(error => console.error('Local MCP restart failed:', error.message)); }
+        catch (error) { console.error(error.message); }
+      }
+    }, 3000);
     watch.unref();
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);
