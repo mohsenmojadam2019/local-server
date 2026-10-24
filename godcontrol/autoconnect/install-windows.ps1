@@ -1,4 +1,4 @@
-# One-time per-user installation; afterwards the agent runs at user logon.
+# One-time per-user installation; afterwards the local MCP and agent run at logon without any prompts.
 # The opt-in file is an operator-controlled ON/OFF switch, not a credential.
 [CmdletBinding()]
 param(
@@ -47,10 +47,16 @@ $settings = [ordered]@{
 $settings | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $settingsPath -Encoding UTF8
 
 if (-not (Test-Path -LiteralPath $tokenPath) -and -not $SkipSecretPrompt) {
-    Write-Host 'One-time setup: enter the token from YOUR OWN local GodControl MCP service.'
-    $secret = Read-Host 'Local MCP token' -AsSecureString
-    $encrypted = ConvertFrom-SecureString -SecureString $secret
-    if ($encrypted) { Set-Content -LiteralPath $tokenPath -Value $encrypted -Encoding ASCII }
+    # Generate and DPAPI-protect a unique local MCP token. No prompts or passwords.
+    $bytes = New-Object byte[] 48
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    $token = [Convert]::ToBase64String($bytes)
+    $secureToken = ConvertTo-SecureString -String $token -AsPlainText -Force
+    $encrypted = ConvertFrom-SecureString -SecureString $secureToken
+    Set-Content -LiteralPath $tokenPath -Value $encrypted -Encoding ASCII
+    $token = $null
+    Write-Host 'Generated unique local MCP token (protected by current-user DPAPI).'
 }
 
 $consent = [ordered]@{
@@ -75,7 +81,7 @@ Write-Host "To stop: .\autoconnect\install-windows.ps1 -DeviceId $DeviceId -Disa
 Write-Host "Check prerequisites: node .\autoconnect\launcher.js --check"
 $oauthPath = Join-Path $HOME '.config\godcontrol\device-oauth.json'
 if (-not (Test-Path -LiteralPath $oauthPath)) {
-    Write-Warning 'OAuth enrollment is still required ONCE for the device. This task cannot bypass login/consent.'
+    Write-Warning 'Device is not yet authenticated: authorize it ONCE (existing OAuth or approved SSH identity). The service will not ask for credentials at every boot.'
 }
 if (-not (Test-Path -LiteralPath $tokenPath)) {
     Write-Warning 'Local MCP secret is missing; start is deferred until the authorized secret is configured.'
