@@ -12,7 +12,7 @@ Once **legitimate initial enrollment and local MCP configuration** exist, the Go
 
 ## Windows `matin`
 
-Prerequisites: Node.js 22+, `npm ci` inside `local-server\godcontrol`, and the existing GodControl local MCP listening on `127.0.0.1:8787`. Perform `npm run agent:enroll` **once** and authorize it with the matching GodControl account. If enrollment is already done, do not repeat it.
+Prerequisites: Node.js 22+ and `npm ci` inside `local-server\godcontrol`. The installer automatically generates the local token and starts a private Windows local MCP on `127.0.0.1:18787`. Device identity still requires a **one-time owner-approved enrollment** (OAuth or pre-authorized SSH tunnel). Once OAuth is enrolled, the saved refresh credential reconnects silently and no repeat browser login is required.
 
 From `C:\Users\matin\local-server\godcontrol`, the once-only installer is:
 
