@@ -18,7 +18,8 @@ function openBrowser(url) {
   let child;
   try {
     if (platform === 'darwin') child = spawn('open', [url], { detached: true, stdio: 'ignore' });
-    else if (platform === 'win32') child = spawn('cmd.exe', ['/c', 'start', '', url], { detached: true, stdio: 'ignore', windowsHide: true });
+    // Do not pass OAuth URLs through cmd.exe: '&' splits query parameters in CMD.
+    else if (platform === 'win32') child = spawn('rundll32.exe', ['url.dll,FileProtocolHandler', url], { detached: true, stdio: 'ignore', windowsHide: true });
     else child = spawn('xdg-open', [url], { detached: true, stdio: 'ignore' });
     child.unref();
     return true;
